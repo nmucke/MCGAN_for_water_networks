@@ -19,6 +19,7 @@ import hamiltorch
 from networkx.linalg.graphmatrix import adjacency_matrix, incidence_matrix
 torch.set_default_dtype(torch.float64)
 from utils.compute_statistics import get_statistics_from_latent_samples
+from plotting import plot_results
 
 def observation_operator(data, obs_idx):
     obs = data[obs_idx]
@@ -94,7 +95,6 @@ if __name__ == "__main__":
     node_data_true, edge_data_true, data_true = \
     node_data_true.to(device), edge_data_true.to(device), data_true.to(device)
 
-    pos = nx.get_node_attributes(G_true, 'pos')
     leak_pipe = data_dict['leak_pipe']
     leak_area = data_dict['leak_area']
 
@@ -128,108 +128,41 @@ if __name__ == "__main__":
                         'prior_std': torch.ones(latent_dim, device=device),
                         'noise_mean': noise_mean,
                         'noise_std': noise_std}
-    HMC_params = {'num_samples': 500,
+    HMC_params = {'num_samples': 100,
                   'step_size': 1.,
                   'num_steps_per_sample': 5,
-                  'burn': 400,
+                  'burn': 50,
                   'integrator': hamiltorch.Integrator.IMPLICIT}
 
     z_samples = hamiltonian_MC(z_init=torch.squeeze(z_map),
                                posterior_params=posterior_params,
                                HMC_params=HMC_params)
 
-    gen_leak_pipe, gen_mean, gen_std, gen_samples = \
+    MCGAN_results = \
         get_statistics_from_latent_samples(z_samples=z_samples,
                                            generator=generator,
-                                           separate_features=False)
+                                           separate_features=False,
+                                           transform=transformer.min_max_inverse_transform)
 
-    gen_leak_pipe, gen_node_mean, gen_edge_mean, gen_node_std, gen_edge_std, \
-    gen_node_samples, gen_edge_samples = \
+    MCGAN_results_separate = \
         get_statistics_from_latent_samples(z_samples=z_samples,
                                            generator=generator,
-                                           separate_features=True)
+                                           separate_features=True,
+                                           transform=transformer.min_max_inverse_transform)
 
-data_dict = nx.read_gpickle(data_string)
-G = data_dict['graph']
-pos = nx.get_node_attributes(G_true,'pos')
+    plot_results.plot_graph_results(G=G_true,
+                                    true_data={"node_data": node_data_true,
+                                               "edge_data": edge_data_true},
+                                    MCGAN_data=MCGAN_results_separate)
 
-true_data = true_data.detach().numpy()
-true_node_data = true_node_data.detach().numpy()
-true_edge_data = true_edge_data.detach().numpy()
-
-vmin = np.min(true_node_data)
-vmax = np.max(true_node_data)
-edge_min = np.min(true_edge_data)
-edge_max = np.max(true_edge_data)
-node_cmap = plt.get_cmap('viridis')
-edge_cmap = plt.get_cmap('viridis')
-
-plt.figure(figsize=(15,12))
-plt.subplot(2,2,1)
-nx.draw(G,pos,with_labels=True, arrows=True,
-        vmin=vmin, vmax=vmax, width=gen_edge_data,
-        edge_vmin=edge_min, edge_vmax=edge_max,
-        edge_color=gen_edge_data, edge_cmap=edge_cmap,
-        node_color=gen_node_data, cmap=node_cmap,)
-sm = plt.cm.ScalarMappable(cmap=node_cmap, norm=plt.Normalize(vmin=vmin, vmax=vmax))
-sm.set_array([])
-cbar = plt.colorbar(sm)
-
-
-plt.subplot(2,2,2)
-nx.draw(G,pos,with_labels=True, arrows=True,
-        vmin=vmin, vmax=vmax,
-        edge_vmin=edge_min, edge_vmax=edge_max,
-        node_color=true_node_data, cmap=node_cmap,)
-sm = plt.cm.ScalarMappable(cmap=node_cmap, norm=plt.Normalize(vmin=vmin, vmax=vmax))
-sm.set_array([])
-cbar = plt.colorbar(sm)
-
-
-diff_node_data = np.abs(true_node_data - gen_node_data)/np.sum(np.abs(true_node_data))
-#diff_edge_data = np.abs(true_edge_data - gen_edge_data)/np.sum(np.abs(true_edge_data))
-
-vmin = np.min(diff_node_data)
-vmax = np.max(diff_node_data)
-#edge_min = np.min(diff_edge_data)
-#edge_max = np.max(diff_edge_data)
-plt.subplot(2,2,3)
-nx.draw(G,pos,with_labels=True, arrows=True,
-        vmin=vmin, vmax=vmax,
-        edge_vmin=edge_min, edge_vmax=edge_max,
-        node_color=diff_node_data, cmap=node_cmap,)
-sm = plt.cm.ScalarMappable(cmap=node_cmap, norm=plt.Normalize(vmin=vmin, vmax=vmax))
-sm.set_array([])
-cbar = plt.colorbar(sm)
-
-
-vmin_std = np.min(gen_node_std)
-vmax_std = np.max(gen_node_std)
-edge_min_std = np.min(gen_edge_std)
-edge_max_std = np.max(gen_edge_std)
-node_cmap = plt.get_cmap('viridis')
-edge_cmap = plt.get_cmap('viridis')
-
-plt.subplot(2,2,4)
-nx.draw(G,pos,with_labels=True, arrows=True,
-        vmin=vmin_std, vmax=vmax_std, width=50*gen_edge_std,
-        edge_vmin=edge_min_std, edge_vmax=edge_max_std,
-        edge_color=gen_edge_std, edge_cmap=edge_cmap,
-        node_color=gen_node_std, cmap=node_cmap,)
-sm = plt.cm.ScalarMappable(cmap=node_cmap,
-                           norm=plt.Normalize(vmin=vmin_std,
-                                              vmax=vmax_std))
-sm.set_array([])
-cbar = plt.colorbar(sm)
-sm = plt.cm.ScalarMappable(cmap=edge_cmap,
-                           norm=plt.Normalize(vmin=edge_min,
-                                              vmax=edge_max))
-sm.set_array([])
-cbar = plt.colorbar(sm)
-
-
-plt.savefig('network_with_leak.pdf')
-plt.show()
+    prior = np.load('prior_data_no_leak.npy')
+    plot_results.plot_histogram_results(G=G_true,
+                                        prior_data={"node_data": prior[:,0:32],
+                                                    "edge_data": prior[:,32:]},
+                                        true_data={"node_data": node_data_true,
+                                                   "edge_data": edge_data_true},
+                                        MCGAN_data=MCGAN_results_separate)
+    pdb.set_trace()
 
 '''
 num_train = 100000

@@ -14,7 +14,7 @@ import ray
 
 
 # Getting path for the input file
-inputfiles_folder_name = 'Input_files_EPANET'
+inputfiles_folder_name = '../Input_files_EPANET'
 filename = 'Hanoi_base_demand.inp'
 path_file = os.path.join(inputfiles_folder_name,filename)
 
@@ -120,17 +120,20 @@ if __name__ == "__main__":
 
         G = nx.Graph(G)
 
-        nx.write_gpickle(G, f'training_data/base_demand_{ids}')
+        nx.write_gpickle(G, f'../data/training_data_no_leak/network_{ids}')
+
+        print(ids)
 
     #ray.init(num_cpus=20)
 
     num_train = 100000
     for ids in range(num_train):
         generate_train_data(covmat_base, base_demands, ids)
+        #generate_train_data.remote(covmat_base, base_demands, ids)
 
 
 
-
+    '''
     G, wn, results = graph_generation(covmat_base,base_demands)
 
     G = nx.Graph(G)
@@ -154,3 +157,4 @@ if __name__ == "__main__":
     sm.set_array([])
     cbar = plt.colorbar(sm)
     plt.show()
+    '''
