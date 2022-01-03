@@ -53,7 +53,7 @@ class Generator(nn.Module):
 
             x = hidden_layer(x)
             x = self.activation(x)
-            #x = batchnorm(x)
+            x = batchnorm(x)
 
         state = self.tanh(self.out_layer_state(x))
 
@@ -87,7 +87,7 @@ class Critic(nn.Module):
 
         self.out_layer = nn.Linear(in_features=self.n_neurons[-1],
                                    out_features=1,
-                                   bias=True)
+                                   bias=False)
 
     def forward(self, x):
         """Forward pass."""

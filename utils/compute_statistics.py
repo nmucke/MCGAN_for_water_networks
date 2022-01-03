@@ -1,3 +1,5 @@
+import pdb
+
 import numpy as np
 import matplotlib.pyplot as plt
 import torch.nn as nn
@@ -16,7 +18,7 @@ def get_statistics_from_latent_samples(z_samples,
     gen_samples, gen_leak_pipe = gen_samples[:, 0:66], gen_samples[:, -33:]
 
     if transform is not None:
-        gen_samples = transform(gen_samples)
+        gen_samples = torch.tensor(transform(gen_samples.detach().numpy()))
 
     if not separate_features:
         gen_mean = torch.mean(gen_samples, dim=0)

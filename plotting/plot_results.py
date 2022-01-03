@@ -89,17 +89,16 @@ def plot_graph_results(G, true_data, MCGAN_data, save_string="MCGAN_results"):
 
 def plot_histogram_results(G, prior_data, true_data, MCGAN_data, 
                            save_string="MCGAN_histogram_results"):
-    pdb.set_trace()
+
     plt.figure(figsize=(15, 15))
     for i in range(MCGAN_data["gen_node_samples"].shape[1]):
         plt.subplot(6, 6, i + 1)
         plt.hist(MCGAN_data["gen_node_samples"][:, i].detach().numpy(), bins=50, density=True, label='Generator')
         plt.hist(prior_data["node_data"][:, i], bins=50, label='Prior', alpha=0.8, density=True)
-        #plt.axvline(x=true_node_data_no_transform[i], ymin=0, ymax=1, color='k',
-        #            linewidth=3.)
+        plt.axvline(x=true_data['node_data'][i], ymin=0, ymax=1, color='k',
+                    linewidth=3.)
         plt.title(list(G.nodes)[i])
         # plt.xlim([80,220])
-
     plt.tight_layout(pad=2.0)
     plt.savefig('distributions_node_with_leak.pdf')
     plt.show()
@@ -108,12 +107,19 @@ def plot_histogram_results(G, prior_data, true_data, MCGAN_data,
     for i in range(MCGAN_data["gen_edge_samples"].shape[1]):
         plt.subplot(6, 6, i + 1)
         plt.hist(MCGAN_data["gen_edge_samples"][:, i].detach().numpy(), bins=50, density=True, label='Generator')
-        plt.hist(prior_data["node_data"][:, i], bins=50, label='Prior', alpha=0.8, density=True)
-        #plt.axvline(x=true_edge_data_no_transform[i - 32], ymin=0, ymax=1,
-        #            color='k', linewidth=3.)
-        plt.title(list(G.edges))
+        plt.hist(prior_data["edge_data"][:, i], bins=50, label='Prior', alpha=0.8, density=True)
+        plt.axvline(x=true_data['edge_data'][i], ymin=0, ymax=1,
+                    color='k', linewidth=3.)
+        # plt.title(list(G.edges))
         # plt.xlim([80,220])
 
     plt.tight_layout(pad=2.0)
     plt.savefig(save_string + '.pdf')
+    plt.show()
+
+def plot_leak_location(gen_leak_location, true_leak_location):
+    plt.figure()
+    plt.bar(range(2, 35), torch.mean(gen_leak_location, dim=0).detach().numpy())
+    plt.axvline(true_leak_location, color='k', linewidth=3.)
+    plt.savefig('bar_plot.pdf')
     plt.show()

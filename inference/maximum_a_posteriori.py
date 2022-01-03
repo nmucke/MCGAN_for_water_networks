@@ -6,7 +6,7 @@ import torch
 import pdb
 
 def compute_MAP(z, observations, generator, obs_operator):
-    optimizer = optim.Adam([z], lr=1e-2)
+    optimizer = optim.Adam([z], lr=1e-2, weight_decay=1.)
 
     loss = nn.MSELoss()
     for i in range(1000):

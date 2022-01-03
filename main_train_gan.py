@@ -44,12 +44,12 @@ if __name__ == "__main__":
 
     latent_dim = 32
     activation = nn.LeakyReLU()
-    transformer = transform_data(a=-1, b=-1,
+    transformer = transform_data(a=-1, b=1,
                                  leak=train_with_leak,
                                  small=small_leak)
 
     training_params = {'latent_dim': latent_dim,
-                       'n_critic': 5,
+                       'n_critic': 3,
                        'gamma': 10,
                        'n_epochs': 10000,
                        'save_string': save_string,
