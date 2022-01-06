@@ -121,7 +121,6 @@ class TrainGAN():
         interpolation = torch.autograd.Variable(interpolation,
                                                 requires_grad=True)
 
-
         interpolation_critic_score = self.critic(interpolation)
 
         grad_outputs = torch.ones(interpolation_critic_score.size(),

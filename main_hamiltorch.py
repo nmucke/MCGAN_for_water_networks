@@ -17,9 +17,10 @@ from inference.maximum_a_posteriori import compute_MAP
 from inference.MCMC import hamiltonian_MC
 import hamiltorch
 from networkx.linalg.graphmatrix import adjacency_matrix, incidence_matrix
-torch.set_default_dtype(torch.float64)
 from utils.compute_statistics import get_statistics_from_latent_samples
 from plotting import plot_results
+
+torch.set_default_dtype(torch.float32)
 
 def observation_operator(data, obs_idx):
     obs = data[obs_idx]
@@ -46,7 +47,7 @@ if __name__ == "__main__":
     train_with_leak = True
     small_leak = False
 
-    case = 0
+    case = 2
     if train_with_leak:
         if small_leak:
             data_path = 'data/training_data_with_leak_small/network_' + str(case)
@@ -63,13 +64,6 @@ if __name__ == "__main__":
                                  leak=train_with_leak,
                                  small=small_leak)
 
-    dataloader_params = {'data_path': data_path,
-                         'num_files': 100000,
-                         'transformer': transformer,
-                         'batch_size': 512,
-                         'shuffle': True,
-                         'num_workers': 8,
-                         'drop_last': True}
     generator_params = {'latent_dim': latent_dim,
                         'par_dim': 33,
                         'output_dim': 66,
@@ -81,7 +75,6 @@ if __name__ == "__main__":
     load_checkpoint(load_string, generator)
     generator.eval()
 
-    dataloader = get_dataloader(**dataloader_params)
 
     data_dict = nx.read_gpickle(data_path)
     G_true = data_dict['graph']
@@ -94,11 +87,12 @@ if __name__ == "__main__":
     node_data_true, edge_data_true, data_true = \
     node_data_true.to(device), edge_data_true.to(device), data_true.to(device)
 
-    leak_pipe = data_dict['leak_pipe']
-    leak_area = data_dict['leak_area']
+    if train_with_leak:
+        leak_pipe = data_dict['leak_pipe']
+        leak_area = data_dict['leak_area']
 
-    obs_idx = range(32)
-    obs_std = .025
+    obs_idx = range(0, 32)
+    obs_std = 0.01
 
     obs_operator = lambda obs: observation_operator(obs, obs_idx)
     observations = obs_operator(data_true).to(device)
@@ -131,11 +125,13 @@ if __name__ == "__main__":
                         'prior_std': torch.ones(latent_dim, device=device),
                         'noise_mean': noise_mean,
                         'noise_std': noise_std}
-    HMC_params = {'num_samples': 50000,
+    HMC_params = {'num_samples': 10000,
                   'step_size': 1.,
                   'num_steps_per_sample': 5,
-                  'burn': 40000,
-                  'integrator': hamiltorch.Integrator.IMPLICIT}
+                  'burn': 8000,
+                  'integrator': hamiltorch.Integrator.IMPLICIT,
+                  'sampler': hamiltorch.Sampler.HMC_NUTS,
+                  'desired_accept_rate': 0.3}
 
     z_samples = hamiltonian_MC(z_init=torch.squeeze(z_map),
                                posterior_params=posterior_params,
@@ -171,83 +167,10 @@ if __name__ == "__main__":
                                         true_data={"node_data": node_data_true,
                                                    "edge_data": edge_data_true},
                                         MCGAN_data=MCGAN_results_separate)
+    if train_with_leak:
+        plot_results.plot_leak_location(gen_leak_location=MCGAN_results['gen_leak_pipe'],
+                                        true_leak_location=leak_pipe)
 
-    plot_results.plot_leak_location(gen_leak_location=MCGAN_results['gen_leak_pipe'],
-                                    true_leak_location=leak_pipe)
-
-'''
-num_train = 100000
-#data_path_state = 'training_data_with_leak/network_'
-data_path_state = 'training_data/base_demand_'
-prior = np.zeros((num_train,66))
-for i in range(num_train):
-    #data_dict = nx.read_gpickle(data_path_state + str(i))
-    #G = data_dict['graph']
-    G = nx.read_gpickle(data_path_state + str(i))
-    node_head = nx.get_node_attributes(G, 'weight')
-    edge_flowrate = nx.get_edge_attributes(G, 'weight')
-
-    node_weigts = [node_head[key][0] for key in node_head.keys()]
-    edge_weights = [edge_flowrate[key][0] for key in edge_flowrate.keys()]
-
-    node_tensor = np.asarray(node_weigts)
-    edge_tensor = np.asarray(edge_weights)
-
-    data = np.concatenate((node_tensor, edge_tensor), axis=0)
-    prior[i,:] = data
-    if i % 1000 == 0:
-        print(i)
-np.save('prior_data_no_leak', prior)
-
-
-
-plt.figure()
-plt.bar(range(2,35), torch.mean(gen_leak_pipe,dim=0).detach().numpy())
-plt.axvline(leak_pipe, color='k', linewidth=3.)
-plt.savefig('bar_plot.pdf')
-plt.show()
-
-
-prior = np.load('prior_data_no_leak.npy')
-
-#transform_no_leak = transform_data.transform_data(leak=False)
-#prior = transform_no_leak.min_max_transform(prior)
-gen_samples = gen_samples.detach().numpy()
-gen_samples = transform.min_max_inverse_transform(gen_samples)
-
-lol = nx.get_node_attributes(G, 'weight')
-plt.figure(figsize=(15,15))
-for i in range(len(gen_node_data)):
-    plt.subplot(6,6,i+1)
-    plt.hist(gen_samples[:,i], bins=50, density=True, label='Generator')
-    plt.hist(prior[:,i], bins=50, label='Prior', alpha=0.8, density=True)
-    plt.axvline(x=true_node_data_no_transform[i],ymin=0,ymax=1, color='k', linewidth=3.)
-    plt.title(list(G.nodes)[i])
-    #plt.xlim([80,220])
-
-plt.tight_layout(pad=2.0)
-plt.savefig('distributions_node_with_leak.pdf')
-plt.show()
-
-lol = nx.get_edge_attributes(G, 'weight')
-plt.figure(figsize=(15,15))
-for i in range(32,32+len(gen_edge_data)-1):
-    plt.subplot(6,6,i+1-32)
-    plt.hist(gen_samples[:,i], bins=50, density=True, label='Generator')
-    plt.hist(prior[:,i], bins=50, label='Prior', alpha=0.8, density=True)
-    plt.axvline(x=true_edge_data_no_transform[i-32],ymin=0,ymax=1, color='k', linewidth=3.)
-    plt.title(list(G.edges)[i-32])
-    #plt.xlim([80,220])
-
-plt.tight_layout(pad=2.0)
-plt.savefig('distributions_edge_with_leak.pdf')
-plt.show()
-
-print(f'Leak location: {leak_pipe}')
-print(f'Leak area: {leak_area}')
-print(f'Var(leak location): {torch.var(gen_leak_pipe):0.3f}')
-
-'''
 
 
 

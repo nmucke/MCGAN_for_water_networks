@@ -1,7 +1,4 @@
-import numpy as np
-import matplotlib.pyplot as plt
-import torch.nn as nn
-import torch.optim as optim
+import pdb
 import torch
 import networkx as nx
 from utils.graph_utils import get_graph_features
@@ -14,32 +11,39 @@ class NetworkDataset(torch.utils.data.Dataset):
 
         self.data_path_state = data_path
         self.num_files = num_files
+        self.transformer = transformer
 
         self.state_IDs = [i for i in range(self.num_files)]
 
-        if transformer is not None:
-            self.transform = transformer
 
     def transform_state(self, data):
-        return self.transform.min_max_transform(data)
+        return self.transformer.min_max_transform(data)
 
     def inverse_transform_state(self, data):
-        return self.transform.min_max_inverse_transform(data)
+        return self.transformer.min_max_inverse_transform(data)
 
     def __len__(self):
         return self.num_files
 
     def __getitem__(self, idx):
-        data_dict = nx.read_gpickle(self.data_path_state + str(idx))
-        G = data_dict['graph']
-        data = get_graph_features(G=G,
-                                  transform=self.transform_state,
-                                  separate_features=False)
-        data = self.transform_state(data)
 
-        par = torch.zeros([33])
-        par[data_dict['leak_pipe']-2] = 1
-        data = torch.cat([data, par])
+        data_dict = nx.read_gpickle(self.data_path_state + str(idx))
+
+        G = data_dict['graph']
+
+        if self.transformer is not None:
+            data = get_graph_features(G=G,
+                                      transform=self.transform_state,
+                                      separate_features=False)
+        else:
+            data = get_graph_features(G=G,
+                                      transform=self.transformer,
+                                      separate_features=False)
+
+        if 'leak_pipe' in data_dict:
+            par = torch.zeros([33])
+            par[data_dict['leak_pipe']-2] = 1
+            data = torch.cat([data, par])
 
         return data
 

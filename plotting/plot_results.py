@@ -2,8 +2,6 @@ import pdb
 
 import numpy as np
 import matplotlib.pyplot as plt
-import torch.nn as nn
-import torch.optim as optim
 import torch
 import networkx as nx
 
@@ -93,7 +91,8 @@ def plot_histogram_results(G, prior_data, true_data, MCGAN_data,
     plt.figure(figsize=(15, 15))
     for i in range(MCGAN_data["gen_node_samples"].shape[1]):
         plt.subplot(6, 6, i + 1)
-        plt.hist(MCGAN_data["gen_node_samples"][:, i].detach().numpy(), bins=50, density=True, label='Generator')
+        plt.hist(MCGAN_data["gen_node_samples"][:, i].detach().numpy(),
+                 bins=50, density=True, label='Generator')
         plt.hist(prior_data["node_data"][:, i], bins=50, label='Prior', alpha=0.8, density=True)
         plt.axvline(x=true_data['node_data'][i], ymin=0, ymax=1, color='k',
                     linewidth=3.)
@@ -106,7 +105,8 @@ def plot_histogram_results(G, prior_data, true_data, MCGAN_data,
     plt.figure(figsize=(15, 15))
     for i in range(MCGAN_data["gen_edge_samples"].shape[1]):
         plt.subplot(6, 6, i + 1)
-        plt.hist(MCGAN_data["gen_edge_samples"][:, i].detach().numpy(), bins=50, density=True, label='Generator')
+        plt.hist(MCGAN_data["gen_edge_samples"][:, i].detach().numpy(),
+                 bins=50, density=True, label='Generator')
         plt.hist(prior_data["edge_data"][:, i], bins=50, label='Prior', alpha=0.8, density=True)
         plt.axvline(x=true_data['edge_data'][i], ymin=0, ymax=1,
                     color='k', linewidth=3.)

@@ -1,9 +1,5 @@
 import pdb
-
-import numpy as np
-import matplotlib.pyplot as plt
 import torch.nn as nn
-import torch.optim as optim
 import torch
 from data_handling.gan_dataloaders import get_dataloader
 import models.GAN_models as GAN_models
@@ -12,7 +8,7 @@ from transforms.transform_data import transform_data
 from utils.seed_everything import seed_everything
 from training.training_GAN import TrainGAN
 
-torch.set_default_dtype(torch.float64)
+torch.set_default_dtype(torch.float32)
 
 if __name__ == "__main__":
 
@@ -60,7 +56,7 @@ if __name__ == "__main__":
                          'transformer': transformer,
                          'batch_size': 512,
                          'shuffle': True,
-                         'num_workers': 8,
+                         'num_workers': 24,
                          'drop_last': True}
     generator_params = {'latent_dim': latent_dim,
                         'par_dim': 33,
@@ -75,13 +71,12 @@ if __name__ == "__main__":
         critic_params['input_dim'] = generator_params['output_dim'] + \
                                       generator_params['par_dim']
     else:
-        critic_params['input_dim'] = generator_params['latent_dim']
+        critic_params['input_dim'] = generator_params['output_dim']
 
     generator = GAN_models.Generator(**generator_params).to(device)
     critic = GAN_models.Critic(**critic_params).to(device)
 
     dataloader = get_dataloader(**dataloader_params)
-
 
     if train_WGAN:
 

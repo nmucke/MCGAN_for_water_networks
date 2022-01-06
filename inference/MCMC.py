@@ -20,7 +20,7 @@ def latent_posterior(z, generator, obs_operator, observations,
     return z_prior_score + reconstruction_score
 
 def hamiltonian_MC(z_init,posterior_params, HMC_params):
-    posterior = lambda z:latent_posterior(z, **posterior_params)
+    posterior = lambda z: latent_posterior(z, **posterior_params)
     z_samples = hamiltorch.sample(log_prob_func=posterior,
                            params_init=z_init,
                            **HMC_params)
