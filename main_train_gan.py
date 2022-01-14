@@ -7,7 +7,8 @@ from utils.load_checkpoint import load_checkpoint
 from transforms.transform_data import transform_data
 from utils.seed_everything import seed_everything
 from training.training_GAN import TrainGAN
-
+from utils.graph_utils import get_adjacency_matrix, create_graph_from_data
+import networkx as nx
 torch.set_default_dtype(torch.float32)
 
 if __name__ == "__main__":
@@ -22,21 +23,25 @@ if __name__ == "__main__":
     print(f'Training GAN on {device}')
 
 
-    train_with_leak = True
+    train_with_leak = False
     small_leak = False
 
     if train_with_leak:
         if small_leak:
             data_path = 'data/training_data_with_leak_small/network_'
+            load_string = 'model_weights/GAN_small_leak'
+            save_string = 'model_weights/GAN_small_leak'
         else:
             data_path = 'data/training_data_with_leak/network_'
+            load_string = 'model_weights/GAN_leak'
+            save_string = 'model_weights/GAN_leak'
     else:
         data_path = 'data/training_data_no_leak/network_'
+        load_string = 'model_weights/GAN_no_leak'
+        save_string = 'model_weights/GAN_no_leak'
 
     train_WGAN = True
     continue_training = False
-    load_string = 'model_weights/GAN_leak'
-    save_string = 'model_weights/GAN_leak'
 
     latent_dim = 32
     activation = nn.LeakyReLU()
@@ -54,19 +59,19 @@ if __name__ == "__main__":
     dataloader_params = {'data_path': data_path,
                          'num_files': 100000,
                          'transformer': transformer,
-                         'batch_size': 512,
+                         'batch_size': 128,
                          'shuffle': True,
-                         'num_workers': 24,
+                         'num_workers': 14,
                          'drop_last': True}
     generator_params = {'latent_dim': latent_dim,
                         'par_dim': 33,
                         'output_dim': 66,
                         'activation': activation,
-                        'n_neurons': [16, 32, 64],
+                        'n_neurons': [32, 48, 64, 80, 96],
                         'leak': train_with_leak}
 
     critic_params = {'activation': activation,
-                     'n_neurons': [64, 32, 16]}
+                     'n_neurons': [96, 80, 64, 48, 32]}
     if train_with_leak:
         critic_params['input_dim'] = generator_params['output_dim'] + \
                                       generator_params['par_dim']
@@ -77,6 +82,8 @@ if __name__ == "__main__":
     critic = GAN_models.Critic(**critic_params).to(device)
 
     dataloader = get_dataloader(**dataloader_params)
+
+    #lol = dataloader.dataset[0]
 
     if train_WGAN:
 

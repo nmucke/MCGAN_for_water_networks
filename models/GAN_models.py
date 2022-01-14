@@ -41,7 +41,10 @@ class Generator(nn.Module):
 
         if self.leak:
             self.softmax = nn.Softmax(dim=1)
-            self.out_layer_par = nn.Linear(in_features=self.n_neurons[-1],
+            self.out_layer_par1 = nn.Linear(in_features=self.n_neurons[-1],
+                                           out_features=self.par_dim,
+                                           bias=True)
+            self.out_layer_par2 = nn.Linear(in_features=self.par_dim,
                                            out_features=self.par_dim,
                                            bias=False)
 
@@ -62,9 +65,11 @@ class Generator(nn.Module):
         state = self.tanh(state)
 
         if self.leak:
-            par = self.out_layer_par(x)
+            par = self.out_layer_par1(x)
+            par = self.activation(par)
+            par = self.out_layer_par2(par)
             par = self.softmax(par)
-            return torch.cat([state,par], dim=1)
+            return torch.cat([state, par], dim=1)
         else:
             return state
 

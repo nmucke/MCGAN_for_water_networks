@@ -3,7 +3,7 @@ import pdb
 import torch.nn as nn
 import torch
 from data_handling.gan_dataloaders import get_dataloader
-import models.GNN_GAN_models as GAN_models
+import models.MPNN_GAN_models as GAN_models
 from utils.load_checkpoint import load_checkpoint
 from transforms.transform_data import transform_data
 from utils.seed_everything import seed_everything

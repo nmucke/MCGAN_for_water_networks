@@ -114,21 +114,16 @@ def graph_generation(cov_mat,nodes_data):
     return G, wn, results
 
 if __name__ == "__main__":
-    #@ray.remote
     def generate_train_data(cov_mat, nodes_data, ids):
         G, wn, results = graph_generation(cov_mat, nodes_data)
-
-        G = nx.Graph(G)
 
         nx.write_gpickle({'graph': G},
                          f'../data/training_data_no_leak/network_{ids}')
 
         print(ids)
 
-    #ray.init(num_cpus=10)
-
     num_train = 100000
-    for ids in range(20500, num_train):
+    for ids in range(41000, num_train):
         generate_train_data(covmat_base, base_demands, ids)
         #generate_train_data.remote(covmat_base, base_demands, ids)
 

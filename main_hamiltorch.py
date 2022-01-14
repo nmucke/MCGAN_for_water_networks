@@ -1,24 +1,20 @@
-import copy
 import pdb
-import numpy as np
-import matplotlib.pyplot as plt
+import numpy as npx
 import torch.nn as nn
-import torch.optim as optim
 import torch
-from data_handling.gan_dataloaders import get_dataloader
 import models.GAN_models as GAN_models
 from utils.load_checkpoint import load_checkpoint
 from transforms.transform_data import transform_data
-from training.training_GAN import TrainGAN
 from utils.seed_everything import seed_everything
 import networkx as nx
-from utils.graph_utils import get_graph_features
+from utils.graph_utils import get_graph_data, get_adjacency_matrix, create_graph_from_data
 from inference.maximum_a_posteriori import compute_MAP
 from inference.MCMC import hamiltonian_MC
 import hamiltorch
-from networkx.linalg.graphmatrix import adjacency_matrix, incidence_matrix
 from utils.compute_statistics import get_statistics_from_latent_samples
 from plotting import plot_results
+import numpy as np
+import matplotlib.pyplot as plt
 
 torch.set_default_dtype(torch.float32)
 
@@ -44,12 +40,23 @@ if __name__ == "__main__":
     print(f'Running on {device}')
 
 
-    train_with_leak = True
+    data_with_leak = True
+    mix_leak = True
+    gan_with_leak = False
     small_leak = False
 
     leak_location_error = []
-    for case in range(5):
-        if train_with_leak:
+    std_list = []
+    obs_error_list = []
+    num_cases = 100
+    for case in range(0,num_cases):
+        if mix_leak:
+            if case < int(num_cases/2):
+                data_with_leak = True
+            else:
+                data_with_leak = False
+
+        if data_with_leak:
             if small_leak:
                 data_path = 'data/training_data_with_leak_small/network_' + str(case)
             else:
@@ -57,20 +64,26 @@ if __name__ == "__main__":
         else:
             data_path = 'data/training_data_no_leak/network_' + str(case)
 
-        load_string = 'model_weights/GAN_leak'
+        if gan_with_leak:
+            if small_leak:
+                load_string = 'model_weights/GAN_small_leak'
+            else:
+                load_string = 'model_weights/GAN_leak'
+        else:
+            load_string = 'model_weights/GAN_no_leak'
 
         latent_dim = 32
         activation = nn.LeakyReLU()
         transformer = transform_data(a=-1, b=1,
-                                     leak=train_with_leak,
+                                     leak=gan_with_leak,
                                      small=small_leak)
 
         generator_params = {'latent_dim': latent_dim,
                             'par_dim': 33,
                             'output_dim': 66,
                             'activation': activation,
-                            'n_neurons': [16, 32, 64],
-                            'leak': train_with_leak}
+                            'n_neurons': [32, 48, 64, 80, 96],
+                            'leak': gan_with_leak}
 
         generator = GAN_models.Generator(**generator_params).to(device)
         load_checkpoint(load_string, generator)
@@ -79,16 +92,20 @@ if __name__ == "__main__":
 
         data_dict = nx.read_gpickle(data_path)
         G_true = data_dict['graph']
-        node_data_true, edge_data_true = get_graph_features(G=G_true,
-                                                  transform=transformer.min_max_transform,
-                                                  separate_features=True)
-        data_true = get_graph_features(G=G_true,
-                                      transform=transformer.min_max_transform,
-                                      separate_features=False)
-        node_data_true, edge_data_true, data_true = \
-        node_data_true.to(device), edge_data_true.to(device), data_true.to(device)
+        adjacency_matrix = get_adjacency_matrix(G_true)
+        node_positions = nx.get_node_attributes(G_true, 'pos')
 
-        if train_with_leak:
+        node_data_true, edge_data_true = get_graph_data(G=G_true,
+                                                        transform=transformer.min_max_transform,
+                                                        separate_features=True)
+        data_true, node_dict, edge_dict = get_graph_data(G=G_true,
+                                                         transform=transformer.min_max_transform,
+                                                         separate_features=False,
+                                                         get_dicts=True)
+        node_data_true, edge_data_true, data_true = \
+            node_data_true.to(device), edge_data_true.to(device), data_true.to(device)
+
+        if data_with_leak:
             leak_pipe = data_dict['leak_pipe']
             leak_area = data_dict['leak_area']
 
@@ -108,14 +125,15 @@ if __name__ == "__main__":
         z_map = compute_MAP(z=z_init,
                             observations=observations,
                             generator=generator,
-                            obs_operator=obs_operator)
+                            obs_operator=obs_operator,
+                            num_iter=1500)
 
-        obs_error = torch.linalg.norm(observations-\
-                      obs_operator(generator(z_map)[0])) \
+        obs_error = torch.linalg.norm(observations- \
+                                      obs_operator(generator(z_map)[0])) \
                     / torch.linalg.norm(observations)
         full_error = torch.linalg.norm(data_true-generator(z_map)
-                    [0,0:generator_params['output_dim']]) \
-                    / torch.linalg.norm(data_true)
+        [0,0:generator_params['output_dim']]) \
+                     / torch.linalg.norm(data_true)
         print(f'Observation error: {obs_error:0.4f}')
         print(f'Full error: {full_error:0.4f}')
 
@@ -126,10 +144,10 @@ if __name__ == "__main__":
                             'prior_std': torch.ones(latent_dim, device=device),
                             'noise_mean': noise_mean,
                             'noise_std': noise_std}
-        HMC_params = {'num_samples': 15000,
+        HMC_params = {'num_samples': 2,
                       'step_size': 1.,
                       'num_steps_per_sample': 5,
-                      'burn': 12000,
+                      'burn': 1,
                       'integrator': hamiltorch.Integrator.IMPLICIT,
                       'sampler': hamiltorch.Sampler.HMC_NUTS,
                       'desired_accept_rate': 0.3}
@@ -139,9 +157,12 @@ if __name__ == "__main__":
                                    HMC_params=HMC_params)
 
 
-        node_data_true, edge_data_true = get_graph_features(G=G_true,
-                                                  transform=None,
-                                                  separate_features=True)
+        data_true = get_graph_data(G=G_true,
+                                   transform=None,
+                                   separate_features=False)
+        node_data_true, edge_data_true = get_graph_data(G=G_true,
+                                                        transform=None,
+                                                        separate_features=True)
         node_data_true, edge_data_true = node_data_true.to(device), edge_data_true.to(device)
 
         MCGAN_results = \
@@ -154,27 +175,76 @@ if __name__ == "__main__":
             get_statistics_from_latent_samples(z_samples=z_samples,
                                                generator=generator,
                                                separate_features=True,
-                                               transform=transformer.min_max_inverse_transform)
-        leak_pipe_estimate = torch.mean(MCGAN_results['gen_leak_pipe'], dim=0)
-        leak_pipe_estimate = torch.argmax(leak_pipe_estimate) + 2
+                                               transform=transformer.min_max_inverse_transform,
+                                               gan_with_leak=gan_with_leak)
+        if gan_with_leak:
+            leak_location_error.append(MCGAN_results['gen_leak_pipe_estimate']
+                                       == leak_pipe)
+        MCGAN_results = \
+            get_statistics_from_latent_samples(z_samples=z_samples,
+                                               generator=generator,
+                                               separate_features=False,
+                                               transform=None)
+        std_list.append(torch.sum(torch.abs(MCGAN_results['gen_std'])).item())
 
-        leak_location_error.append(leak_pipe_estimate.item() is leak_pipe)
+        #obs_error = torch.linalg.norm(observations-obs_operator(MCGAN_results['gen_mean'])) \
+        #            / torch.linalg.norm(observations)
+        #obs_error_list.append(obs_error.item())
 
-    print(sum(leak_location_error))
 
-    plot_results.plot_graph_results(G=G_true,
-                                    true_data={"node_data": node_data_true,
-                                               "edge_data": edge_data_true},
-                                    MCGAN_data=MCGAN_results_separate)
+        obs_error = torch.linalg.norm(observations-obs_operator(generator(z_map)[0])) \
+                    / torch.linalg.norm(observations)
+        obs_error_list.append(obs_error.item())
+
+        print(f'Case {case} is done.')
+
+
+    plt.figure()
+    plt.subplot(1,2,1)
+    if gan_with_leak:
+        true_std_list = [i for (i, v) in zip(std_list, leak_location_error) if v]
+        false_std_list = [i for (i, v) in zip(std_list, leak_location_error) if not v]
+        plt.hist(true_std_list, label='True', density=True)
+        plt.hist(false_std_list, alpha=0.7, label='False', density=True)
+    elif mix_leak:
+        plt.hist(std_list[0:int(num_cases/2)], label='Leak', density=True)
+        plt.hist(std_list[-int(num_cases/2):], alpha=0.7, label='No Leak', density=True)
+    plt.title('Standard Deviation')
+    plt.legend()
+
+    plt.subplot(1,2,2)
+    if gan_with_leak:
+        true_obs_error_list = [i for (i, v) in zip(obs_error_list, leak_location_error) if v]
+        false_obs_error_list = [i for (i, v) in zip(obs_error_list, leak_location_error) if not v]
+        plt.hist(true_obs_error_list, label='True', density=True)
+        plt.hist(false_obs_error_list, alpha=0.7, label='False', density=True)
+    elif mix_leak:
+        plt.hist(obs_error_list[0:int(num_cases/2)], label='Leak', density=True)
+        plt.hist(obs_error_list[-int(num_cases/2):], alpha=0.7, label='No Leak', density=True)
+    plt.title('Observation Error')
+    plt.legend()
+    plt.show()
 
     prior = np.load('prior_data_no_leak.npy')
+    G_true = create_graph_from_data(data_true, node_dict, edge_dict, G_true)
+    plot_results.plot_graph_results(G=G_true,
+                                    true_data={"node_data": node_data_true,
+                                               "edge_data": edge_data_true,
+                                               "leak_pipe": leak_pipe},
+                                    MCGAN_data=MCGAN_results_separate,
+                                    prior_data=prior,
+                                    node_dict=node_dict,
+                                    edge_dict=edge_dict)
+
     plot_results.plot_histogram_results(G=G_true,
                                         prior_data={"node_data": prior[:,0:32],
                                                     "edge_data": prior[:,32:]},
                                         true_data={"node_data": node_data_true,
                                                    "edge_data": edge_data_true},
+                                        node_dict=node_dict,
+                                        edge_dict=edge_dict,
                                         MCGAN_data=MCGAN_results_separate)
-    if train_with_leak:
+    if gan_with_leak:
         plot_results.plot_leak_location(gen_leak_location=MCGAN_results['gen_leak_pipe'],
                                         true_leak_location=leak_pipe)
 

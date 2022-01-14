@@ -5,11 +5,11 @@ import torch.optim as optim
 import torch
 import pdb
 
-def compute_MAP(z, observations, generator, obs_operator):
+def compute_MAP(z, observations, generator, obs_operator, num_iter=3000):
     optimizer = optim.Adam([z], lr=1e-2)
 
     loss = nn.MSELoss()
-    for i in range(5000):
+    for i in range(num_iter):
         optimizer.zero_grad()
         error = loss(observations, obs_operator(generator(z)[0, 0:66]))
         error.backward()

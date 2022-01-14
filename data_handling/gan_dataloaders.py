@@ -1,7 +1,7 @@
 import pdb
 import torch
 import networkx as nx
-from utils.graph_utils import get_graph_features
+from utils.graph_utils import get_graph_features, get_graph_data
 
 
 
@@ -32,14 +32,13 @@ class NetworkDataset(torch.utils.data.Dataset):
         G = data_dict['graph']
 
         if self.transformer is not None:
-            data = get_graph_features(G=G,
+            data = get_graph_data(G=G,
                                       transform=self.transform_state,
                                       separate_features=False)
         else:
-            data = get_graph_features(G=G,
+            data = get_graph_data(G=G,
                                       transform=self.transformer,
                                       separate_features=False)
-
         if 'leak_pipe' in data_dict:
             par = torch.zeros([33])
             par[data_dict['leak_pipe']-2] = 1

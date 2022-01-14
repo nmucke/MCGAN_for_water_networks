@@ -2,6 +2,7 @@ import pdb
 import numpy as np
 import networkx as nx
 import torch
+from utils.graph_utils import get_graph_data
 
 
 class transform_data():
@@ -44,32 +45,27 @@ class transform_data():
                /(self.b-self.a) + self.min_vec
 
 if __name__ == "__main__":
-    data_path_state = '../data/training_data_with_leak/network_'
+    data_path_state = '../data/training_data_with_leak_small/network_'
 
     data = []
     for i in range(100000):
         #G = nx.read_gpickle(data_path_state + str(i))
         data_dict = nx.read_gpickle(data_path_state + str(i))
         G = data_dict['graph']
+        graph_data = get_graph_data(G=G,
+                              transform=None,
+                              separate_features=False)
 
-        node_head = nx.get_node_attributes(G, 'weight')
-        edge_flowrate = nx.get_edge_attributes(G, 'weight')
+        data.append(graph_data)
 
-        node_weigts = [node_head[key][0] for key in node_head.keys()]
-        edge_weights = [edge_flowrate[key][0] for key in edge_flowrate.keys()]
-
-        node_tensor = np.array(node_weigts)
-        edge_tensor = np.array(edge_weights)
-
-        data.append(np.concatenate((node_tensor, edge_tensor), axis=0))
         if i % 1000 == 0:
             print(i)
 
-    data = np.asarray(data)
+    data = torch.stack(data).detach().numpy()
     max_vec = np.max(data, axis=0)
     min_vec = np.min(data, axis=0)
 
-    np.save('max_min_data_with_leak', {'max_vec':max_vec,
+    np.save('max_min_data_with_leak_small', {'max_vec':max_vec,
                              'min_vec':min_vec})
 
 

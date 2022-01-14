@@ -1,25 +1,10 @@
 import pdb
-
-import numpy as np
-import matplotlib.pyplot as plt
-import torch.nn as nn
-import torch.optim as optim
-import torch
 import os
 import wntr
-import networkx as nx
-from networkx.linalg.graphmatrix import adjacency_matrix
 import copy
 import ray
-from networkx.linalg.graphmatrix import adjacency_matrix, incidence_matrix
-
-from wntr import *
-from wntr.sim.hydraulics import *
 from wntr.network.model import *
 from wntr.sim.solvers import *
-from wntr.sim.results import *
-
-from scipy.optimize import fsolve
 
 # function to create a covariance matrix
 def cov_mat_fixed(corr_demands, corr_reservoir_nodes):
@@ -91,8 +76,17 @@ def graph_generation(cov_mat,nodes_data, leak, wn):
 
     G = wn.get_graph(node_weight=results.node['head'],
                      link_weight=results.link['flowrate'])
+    '''
+    lol = list(G.edges)
+    for i in lol:
+        print(i[2])
 
-    G = nx.Graph(G)
+    lal = list(G.nodes)
+    for i in lal:
+        print(i)
+    pdb.set_trace()
+    '''
+    #G = nx.Graph(G)
     '''
     pos = nx.get_node_attributes(G, 'pos')
     node_head = nx.get_node_attributes(G, 'weight')
@@ -145,7 +139,7 @@ def graph_generation(cov_mat,nodes_data, leak, wn):
 
 if __name__ == "__main__":
     # Getting path for the input file
-    inputfiles_folder_name = 'Input_files_EPANET'
+    inputfiles_folder_name = '../Input_files_EPANET'
     filename = 'Hanoi_base_demand.inp'
     path_file = os.path.join(inputfiles_folder_name,filename)
 
@@ -187,20 +181,19 @@ if __name__ == "__main__":
     def generate_train_data(cov_mat, nodes_data, leak, wn, ids):
         G, wn, results = graph_generation(cov_mat, nodes_data, leak, wn)
 
-        G = nx.Graph(G)
-
+        #G = nx.Graph(G)
         save_dict = {'graph': G,
                      'leak_pipe': leak['pipe'],
                      'leak_area': leak['area']}
         print(ids)
 
-        nx.write_gpickle(save_dict, f'training_data_with_leak_small/network_{ids}')
+        nx.write_gpickle(save_dict, f'../data/training_data_with_leak_small/network_{ids}')
 
     ray.init(num_cpus=30)
     num_train = 100000
     leak_pipes = np.random.randint(low=2, high=35, size=num_train)
     leak_areas = np.random.uniform(low=0.001, high=0.01, size=num_train)
-    for ids in range(num_train):
+    for ids in range(24000, num_train):
         leak = {'pipe': leak_pipes[ids],
                 'area': leak_areas[ids]}
         generate_train_data(covmat_base, base_demands, leak, wn, ids)
