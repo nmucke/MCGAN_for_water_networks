@@ -10,6 +10,7 @@ from training.training_GAN import TrainGAN
 from utils.graph_utils import get_adjacency_matrix, create_graph_from_data
 import networkx as nx
 torch.set_default_dtype(torch.float32)
+import pickle
 
 if __name__ == "__main__":
 
@@ -26,55 +27,67 @@ if __name__ == "__main__":
     train_with_leak = False
     small_leak = False
 
+    small_demand_variance = True
+
+    train_WGAN = True
+    continue_training = True
+
     if train_with_leak:
         if small_leak:
             data_path = 'data/training_data_with_leak_small/network_'
             load_string = 'model_weights/GAN_small_leak'
             save_string = 'model_weights/GAN_small_leak'
         else:
-            data_path = 'data/training_data_with_leak/network_'
-            load_string = 'model_weights/GAN_leak'
-            save_string = 'model_weights/GAN_leak'
+            if small_demand_variance:
+                data_path = 'data/training_data_with_leak_small_demand_variance/network_'
+                load_string = 'model_weights/GAN_leak_small_demand_variance'
+                save_string = 'model_weights/GAN_leak_small_demand_variance'
+            else:
+                data_path = 'data/training_data_with_leak/network_'
+                load_string = 'model_weights/GAN_leak'
+                save_string = 'model_weights/GAN_leak'
     else:
-        data_path = 'data/training_data_no_leak/network_'
-        load_string = 'model_weights/GAN_no_leak'
-        save_string = 'model_weights/GAN_no_leak'
+        if small_demand_variance:
+            data_path = 'data/training_data_no_leak_small_demand_variance/network_'
+            load_string = 'model_weights/GAN_no_leak_small_demand_variance'
+            save_string = 'model_weights/GAN_no_leak_small_demand_variance'
+        else:
+            data_path = 'data/training_data_no_leak/network_'
+            load_string = 'model_weights/GAN_no_leak'
+            save_string = 'model_weights/GAN_no_leak'
 
-    train_WGAN = True
-    continue_training = False
-
-    latent_dim = 32
-    activation = nn.LeakyReLU()
+    latent_dim = 16
+    activation = nn.Tanh()
     transformer = transform_data(a=-1, b=1,
                                  leak=train_with_leak,
                                  small=small_leak)
 
     training_params = {'latent_dim': latent_dim,
-                       'n_critic': 3,
+                       'n_critic': 2,
                        'gamma': 10,
                        'n_epochs': 10000,
                        'save_string': save_string,
                        'device': device}
     optimizer_params = {'learning_rate': 1e-4}
     dataloader_params = {'data_path': data_path,
-                         'num_files': 100000,
+                         'num_files': 200000,
                          'transformer': transformer,
-                         'batch_size': 128,
+                         'batch_size': 256,
                          'shuffle': True,
-                         'num_workers': 14,
+                         'num_workers': 12,
                          'drop_last': True}
     generator_params = {'latent_dim': latent_dim,
                         'par_dim': 33,
                         'output_dim': 66,
                         'activation': activation,
-                        'n_neurons': [32, 48, 64, 80, 96],
+                        'n_neurons': [16, 32, 48, 64],
                         'leak': train_with_leak}
 
     critic_params = {'activation': activation,
-                     'n_neurons': [96, 80, 64, 48, 32]}
+                     'n_neurons': [96, 80, 64, 48, 32, 16]}
     if train_with_leak:
         critic_params['input_dim'] = generator_params['output_dim'] + \
-                                      generator_params['par_dim']
+                                     generator_params['par_dim']
     else:
         critic_params['input_dim'] = generator_params['output_dim']
 
@@ -82,8 +95,6 @@ if __name__ == "__main__":
     critic = GAN_models.Critic(**critic_params).to(device)
 
     dataloader = get_dataloader(**dataloader_params)
-
-    #lol = dataloader.dataset[0]
 
     if train_WGAN:
 

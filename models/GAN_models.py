@@ -42,11 +42,19 @@ class Generator(nn.Module):
         if self.leak:
             self.softmax = nn.Softmax(dim=1)
             self.out_layer_par1 = nn.Linear(in_features=self.n_neurons[-1],
-                                           out_features=self.par_dim,
+                                           out_features=self.n_neurons[-2],
                                            bias=True)
-            self.out_layer_par2 = nn.Linear(in_features=self.par_dim,
+            self.batchnorm_par1 = nn.BatchNorm1d(self.n_neurons[-2])
+
+            self.out_layer_par2 = nn.Linear(in_features=self.n_neurons[-2],
+                                           out_features=self.n_neurons[-2],
+                                           bias=True)
+            self.batchnorm_par2 = nn.BatchNorm1d(self.n_neurons[-2])
+
+            self.out_layer_par3 = nn.Linear(in_features=self.n_neurons[-2],
                                            out_features=self.par_dim,
                                            bias=False)
+
 
     def forward(self, x):
         """Forward pass."""
@@ -67,7 +75,11 @@ class Generator(nn.Module):
         if self.leak:
             par = self.out_layer_par1(x)
             par = self.activation(par)
+            par = self.batchnorm_par1(par)
             par = self.out_layer_par2(par)
+            par = self.activation(par)
+            par = self.batchnorm_par2(par)
+            par = self.out_layer_par3(par)
             par = self.softmax(par)
             return torch.cat([state, par], dim=1)
         else:

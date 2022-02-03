@@ -1,16 +1,9 @@
+import pdb
 
 import numpy as np
-import pandas as pd
 import os
-import matplotlib.pyplot as plt
 import wntr
 import networkx as nx
-import copy
-import pdb
-import seaborn as sbn
-import networkx as nx
-from networkx.linalg.graphmatrix import adjacency_matrix
-import ray
 
 
 # Getting path for the input file
@@ -67,7 +60,7 @@ def cov_mat_fixed(corr_demands, corr_reservoir_nodes):
     return cov_mat
 
 #Covmat for all experiments
-covmat_base = cov_mat_fixed(0.6,0.0)
+covmat_base = 0.25*cov_mat_fixed(0.6,0.0)
 
 # Column names for the dataframe that will store results. Note that the Reservoir Demand and Head comes after all
 # other nodes. Naming is done accordingly.
@@ -87,9 +80,6 @@ def graph_generation(cov_mat,nodes_data):
 
     #removing samples with negative values
     train_data_raw_positive = train_data_raw[train_data_raw.min(axis=1)>=0,:]
-
-    #creating numpy arrays to store EPANET simulation output
-    train_samples_positive = train_data_raw_positive.shape[0]
 
     # updating reservoir head in the epanet input
     wn.get_node(1).head_timeseries.base_value = train_data_raw_positive[0,0]
@@ -118,39 +108,12 @@ if __name__ == "__main__":
         G, wn, results = graph_generation(cov_mat, nodes_data)
 
         nx.write_gpickle({'graph': G},
-                         f'../data/training_data_no_leak/network_{ids}')
+                         f'../data/training_data_no_leak_small_demand_variance/network_{ids}')
 
         print(ids)
 
-    num_train = 100000
-    for ids in range(41000, num_train):
+    num_train = 200000
+    for ids in range(100000, num_train):
         generate_train_data(covmat_base, base_demands, ids)
         #generate_train_data.remote(covmat_base, base_demands, ids)
 
-
-
-    '''
-    G, wn, results = graph_generation(covmat_base,base_demands)
-
-    G = nx.Graph(G)
-
-    pos=nx.get_node_attributes(G,'pos')
-    node_head=nx.get_node_attributes(G,'weight')
-    edge_flowrate = nx.get_edge_attributes(G,'weight')
-
-
-    node_weigts = [node_head[key][0] for key in node_head.keys()]
-    edge_weights = [edge_flowrate[key][0] for key in edge_flowrate.keys()]
-
-
-    vmin = np.min(node_weigts)
-    vmax = np.max(node_weigts)
-    cmap = plt.get_cmap('viridis')
-
-    nx.draw(G,pos,with_labels=True, arrows=True, cmap=cmap, width=edge_weights,
-            node_color=node_weigts, vmin=vmin, vmax=vmax)
-    sm = plt.cm.ScalarMappable(cmap=cmap, norm=plt.Normalize(vmin=vmin, vmax=vmax))
-    sm.set_array([])
-    cbar = plt.colorbar(sm)
-    plt.show()
-    '''
