@@ -11,7 +11,7 @@ def latent_posterior(z, generator, obs_operator, observations,
                                                prior_std).log_prob(z).sum()
 
     generated_state = generator(z.view(1, len(z)))
-    gen_measurement = obs_operator(generated_state[0])
+    gen_measurement = obs_operator(generated_state)
     error = observations - gen_measurement
     error = error.detach()
     reconstruction_score = torch.distributions.Normal(noise_mean,

@@ -217,8 +217,7 @@ if __name__ == "__main__":
     base_demands = np.zeros((num_nodes))
     base_demands[0] = wn1.get_node(1).head_timeseries.base_value
     for i in range(1, num_nodes):
-        base_demands[i] = wn1.get_node(i + 1).demand_timeseries_list[
-            0].base_value
+        base_demands[i] = wn1.get_node(i + 1).demand_timeseries_list[0].base_value
 
     # define standard deviation matrix
     std_dev = base_demands * 0.2
@@ -265,7 +264,7 @@ if __name__ == "__main__":
     plt.figure(figsize=(10,10))
     plt.subplot(2,2,1)
     plt.plot(range(1,33), demand_leak, label='True Leak Demand')
-    plt.plot(range(1,33), demand, label='True Non-Leak Demand')
+    #plt.plot(range(1,33), demand, label='True Non-Leak Demand')
     plt.plot(range(1,33), demand_pred, label='Pred Leak Demand')
     plt.axvline(x=leak_pipe, linewidth=2, color='k')
     plt.legend()

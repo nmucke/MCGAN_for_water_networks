@@ -11,7 +11,7 @@ def compute_MAP(z, observations, generator, obs_operator, num_iter=3000):
     loss = nn.MSELoss()
     for i in range(num_iter):
         optimizer.zero_grad()
-        error = loss(observations, obs_operator(generator(z)[0, 0:66]))
+        error = loss(observations, obs_operator(generator(z)))
         error.backward()
         optimizer.step()
 

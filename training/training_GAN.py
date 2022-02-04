@@ -2,13 +2,15 @@ import torchvision.transforms as transforms
 import torch
 import pdb
 from tqdm import tqdm
+import os
+import wntr
+from utils.graph_utils import get_incidence_mat
+import matplotlib.pyplot as plt
 
 class TrainGAN():
     def __init__(self, generator, critic, generator_optimizer, critic_optimizer,
                  latent_dim=100, n_critic=5, gamma=10, n_epochs=100,
                  save_string=None, device='cpu'):
-
-        self.to_pil_image = transforms.ToPILImage()
 
         self.device = device
         self.generator = generator
@@ -24,6 +26,18 @@ class TrainGAN():
         self.gamma = gamma
         self.n_epochs = n_epochs
         self.save_string = save_string
+
+
+        inputfiles_folder_name = 'Input_files_EPANET'
+        filename = 'Hanoi_base_demand.inp'
+        path_file = os.path.join(inputfiles_folder_name, filename)
+
+        # Reading the input file into EPANET
+        inp_file = path_file
+        wn = wntr.network.WaterNetworkModel(inp_file)
+        self.incidence_mat = torch.tensor(get_incidence_mat(wn),
+                                          dtype=torch.get_default_dtype(),
+                                          device=self.device)
 
     def train(self, data_loader):
         """Train generator and critic"""
@@ -70,13 +84,16 @@ class TrainGAN():
     def train_epoch(self, data_loader):
         """Train generator and critic for one epoch"""
 
-        for bidx, real_data in tqdm(enumerate(data_loader),
+        for bidx, (real_data, demand) in tqdm(enumerate(data_loader),
                  total=int(len(data_loader.dataset)/data_loader.batch_size)):
             current_batch_size = len(real_data)
 
             real_data = real_data.to(self.device)
 
-            #for i in range(self.n_critic):
+            #leak_location = torch.argmax(real_data[:, -34:], dim=1).detach().cpu()
+            #print(leak_location)
+
+            #pdb.set_trace()
             c_loss, grad_penalty = self.critic_train_step(real_data)
 
             if bidx % self.n_critic == 0:

@@ -5,6 +5,31 @@ from networkx.convert_matrix import from_numpy_matrix
 import numpy as np
 from networkx.convert_matrix import to_numpy_matrix
 import copy
+import pandas as pd
+
+def get_incidence_mat(WNTR_model):
+    incidence_mat = np.zeros((34,32))
+
+    for i in range(1,33):
+        inlet_ids = WNTR_model.get_links_for_node(str(i), 'INLET')
+        outlet_ids = WNTR_model.get_links_for_node(str(i), 'OUTLET')
+        for j in inlet_ids:
+            incidence_mat[int(j)-1, i-1] = -1
+        for j in outlet_ids:
+            incidence_mat[int(j)-1, i-1] = 1
+    return incidence_mat
+
+def incidence_to_adjacency(incidence_mat):
+    adjacency_mat = (np.dot(np.abs(incidence_mat).T, np.abs(incidence_mat)) > 0).astype(int)
+    np.fill_diagonal(adjacency_mat, 0)
+    return adjacency_mat
+
+def get_edge_lists():
+    A = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 10, 14, 15, 16, 17, 18, 19, 3,
+         20, 21, 20, 23, 24, 25, 26, 27, 23, 28, 29, 30, 31, 32]
+    B = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 3, 20,
+         21, 22, 23, 24, 25, 26, 27, 16, 28, 29, 30, 31, 32, 25]
+    return A, B
 
 def get_adjacency_matrix(G):
     num_nodes = len(G.nodes)
@@ -15,21 +40,40 @@ def get_adjacency_matrix(G):
 
     return A
 
-def create_graph_from_data(data, node_dict, edge_dict, G_old):
 
-    G = copy.deepcopy(G_old)
-    num_nodes = len(node_dict.keys())
-    num_edges = len(edge_dict.keys())
 
-    node_values = {}
-    for key in node_dict.keys():
-        node_values[node_dict[key]] = data[key].item()
-    nx.set_node_attributes(G, node_values, "weight")
 
-    edge_values = {}
-    for key in edge_dict.keys():
-        edge_values[edge_dict[key]] = data[num_nodes + key].item()
-    nx.set_edge_attributes(G, edge_values, "weight")
+def create_graph_from_data(data, G_old, incidence_mat):
+    flow_rate = data['flow_rate']['mean'].unsqueeze(dim=1).detach().numpy()
+    head = data['head']['mean'].unsqueeze(dim=1).detach().numpy()
+    demand = data['demand']['mean'].unsqueeze(dim=1).detach().numpy()
+
+    flow_rate_std = data['flow_rate']['std'].unsqueeze(dim=1).detach().numpy()
+    head_std = data['head']['std'].unsqueeze(dim=1).detach().numpy()
+    demand_std = data['demand']['std'].unsqueeze(dim=1).detach().numpy()
+
+    head_df = pd.DataFrame(data=head.T, columns=range(1, 33))
+    demand_df = pd.DataFrame(data=demand.T, columns=range(1, 33))
+
+    head_std_df = pd.DataFrame(data=head_std.T, columns=range(1, 33))
+    demand_std_df = pd.DataFrame(data=demand_std.T, columns=range(1, 33))
+
+    pos = {}
+    for i in range(1, 33):
+        pos[i] = nx.get_node_attributes(G_old, 'pos')[i]
+
+    A, B = get_edge_lists()
+    df = pd.DataFrame(flow_rate[:, 0:1], columns=['flow_rate'])
+    df['flow_rate_std'] = flow_rate_std
+    df['a'] = A
+    df['b'] = B
+    G = nx.from_pandas_edgelist(df, source='a', target='b',
+                                edge_attr=['flow_rate', 'flow_rate_std'])
+    nx.set_node_attributes(G, head_df, name='head')
+    nx.set_node_attributes(G, head_std_df, name='head_std')
+    nx.set_node_attributes(G, demand_df, name='demand')
+    nx.set_node_attributes(G, demand_std_df, name='demand_std')
+    nx.set_node_attributes(G, pos, name='pos')
 
     return G
 

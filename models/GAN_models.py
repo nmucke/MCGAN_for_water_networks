@@ -51,8 +51,13 @@ class Generator(nn.Module):
                                            bias=True)
             self.batchnorm_par2 = nn.BatchNorm1d(self.n_neurons[-2])
 
-            self.out_layer_par3 = nn.Linear(in_features=self.n_neurons[-2],
-                                           out_features=self.par_dim,
+            self.out_layer_location = nn.Linear(in_features=self.n_neurons[-2],
+                                           out_features=self.par_dim-1,
+                                           bias=False)
+
+
+            self.out_layer_demand= nn.Linear(in_features=self.n_neurons[-2],
+                                           out_features=1,
                                            bias=False)
 
 
@@ -70,7 +75,7 @@ class Generator(nn.Module):
             x = batchnorm(x)
 
         state = self.out_layer_state(x)
-        state = self.tanh(state)
+        #state = self.tanh(state)
 
         if self.leak:
             par = self.out_layer_par1(x)
@@ -79,9 +84,10 @@ class Generator(nn.Module):
             par = self.out_layer_par2(par)
             par = self.activation(par)
             par = self.batchnorm_par2(par)
-            par = self.out_layer_par3(par)
-            par = self.softmax(par)
-            return torch.cat([state, par], dim=1)
+            par_location = self.out_layer_location(par)
+            par_location = self.softmax(par_location)
+            par_demand = self.out_layer_demand(par)
+            return torch.cat([state, par_demand, par_location], dim=1)
         else:
             return state
 

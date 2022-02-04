@@ -15,6 +15,7 @@ class NetworkDataset(torch.utils.data.Dataset):
 
         self.state_IDs = [i for i in range(self.num_files)]
 
+        self.dtype = torch.get_default_dtype()
 
     def transform_state(self, data):
         return self.transformer.min_max_transform(data)
@@ -29,22 +30,19 @@ class NetworkDataset(torch.utils.data.Dataset):
 
         data_dict = nx.read_gpickle(self.data_path_state + str(idx))
 
-        G = data_dict['graph']
+        flow_rate = torch.tensor(data_dict['flow_rate'].values, dtype=self.dtype)[0]
+        head = torch.tensor(data_dict['head'].values, dtype=self.dtype)[0]
+        demand = torch.tensor(data_dict['demand'].values, dtype=self.dtype)[0]
 
-        if self.transformer is not None:
-            data = get_graph_data(G=G,
-                                      transform=self.transform_state,
-                                      separate_features=False)
-        else:
-            data = get_graph_data(G=G,
-                                      transform=self.transformer,
-                                      separate_features=False)
-        if 'leak_pipe' in data_dict:
-            par = torch.zeros([33])
-            par[data_dict['leak_pipe']-2] = 1
-            data = torch.cat([data, par])
+        data = torch.cat([flow_rate, head], dim=0)
 
-        return data
+        if 'leak' in data_dict:
+            pars = torch.zeros([35,], dtype=self.dtype)
+            pars[0] = torch.tensor(data_dict['leak']['demand'], dtype=self.dtype)
+            pars[data_dict['leak']['pipe']] = 1
+            data = torch.cat([data, pars], dim=0)
+
+        return data, demand
 
 def get_dataloader(data_path,
                     num_files=100000,
