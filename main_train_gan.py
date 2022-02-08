@@ -19,7 +19,7 @@ if __name__ == "__main__":
 
     seed_everything()
 
-    cuda = True
+    cuda = False
     if cuda:
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     else:
@@ -29,11 +29,12 @@ if __name__ == "__main__":
 
     train_with_leak = True
     small_leak = False
+    train_with_physics_loss = 1e-4
 
     small_demand_variance = False
 
     train_WGAN = True
-    continue_training = True
+    continue_training = False
 
     if train_with_leak:
         if small_leak:
@@ -49,6 +50,11 @@ if __name__ == "__main__":
                 data_path = 'data/training_data_with_leak/network_'
                 load_string = 'model_weights/GAN_leak'
                 save_string = 'model_weights/GAN_leak'
+            if train_with_physics_loss:
+                data_path = 'data/training_data_with_leak/network_'
+                load_string = 'model_weights/GAN_leak_and_pysics_loss'
+                save_string = 'model_weights/GAN_leak_and_pysics_loss'
+
     else:
         if small_demand_variance:
             data_path = 'data/training_data_no_leak_small_demand_variance/network_'
@@ -71,6 +77,7 @@ if __name__ == "__main__":
                        'gamma': 10,
                        'n_epochs': 1000,
                        'save_string': save_string,
+                       'physics_loss': train_with_physics_loss,
                        'device': device}
     optimizer_params = {'learning_rate': 1e-4}
     dataloader_params = {'data_path': data_path,

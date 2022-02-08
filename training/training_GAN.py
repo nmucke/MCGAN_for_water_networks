@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 class TrainGAN():
     def __init__(self, generator, critic, generator_optimizer, critic_optimizer,
                  latent_dim=100, n_critic=5, gamma=10, n_epochs=100,
-                 save_string=None, device='cpu'):
+                 save_string=None, physics_loss=None, device='cpu'):
 
         self.device = device
         self.generator = generator
@@ -27,22 +27,32 @@ class TrainGAN():
         self.n_epochs = n_epochs
         self.save_string = save_string
 
+        self.physics_loss = physics_loss
+
+
+        # Reading the input file into EPANET
+        #if self.physics_loss is not None:
 
         inputfiles_folder_name = 'Input_files_EPANET'
         filename = 'Hanoi_base_demand.inp'
         path_file = os.path.join(inputfiles_folder_name, filename)
-
-        # Reading the input file into EPANET
         inp_file = path_file
         wn = wntr.network.WaterNetworkModel(inp_file)
         self.incidence_mat = torch.tensor(get_incidence_mat(wn),
                                           dtype=torch.get_default_dtype(),
                                           device=self.device)
 
+    def physics_loss_function(self, gen_data):
+
+        leak_demand = gen_data[:, 66]
+        demand_pred = torch.matmul(-self.incidence_mat.T,
+                                   gen_data[:, 0:34].T)
+        loss = leak_demand + demand_pred.sum(dim=0)
+        return loss
+
     def train(self, data_loader):
         """Train generator and critic"""
 
-        images = []
         generator_loss = []
         critic_loss = []
         gradient_penalty = []
@@ -120,8 +130,12 @@ class TrainGAN():
 
         self.G_opt.zero_grad()
         generated_data = self.sample(batch_size)
-
-        g_loss = - self.critic(generated_data).mean()
+        if self.physics_loss is not None:
+            phys_loss = self.physics_loss_function(generated_data)
+            g_loss = - self.critic(generated_data).mean() \
+                     + self.physics_loss*phys_loss.mean()
+        else:
+            g_loss = - self.critic(generated_data).mean()
         g_loss.backward()
         self.G_opt.step()
 
