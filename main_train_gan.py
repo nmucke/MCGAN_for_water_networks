@@ -19,7 +19,7 @@ if __name__ == "__main__":
 
     seed_everything()
 
-    cuda = False
+    cuda = True
     if cuda:
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     else:
@@ -29,12 +29,12 @@ if __name__ == "__main__":
 
     train_with_leak = True
     small_leak = False
-    train_with_physics_loss = 1e-4
+    train_with_physics_loss = True
 
     small_demand_variance = False
 
     train_WGAN = True
-    continue_training = False
+    continue_training = True
 
     if train_with_leak:
         if small_leak:
@@ -66,16 +66,16 @@ if __name__ == "__main__":
             save_string = 'model_weights/GAN_no_leak'
 
 
-    latent_dim = 16
+    latent_dim = 32
     activation = nn.LeakyReLU()
-    transformer = None#transform_data(a=-1, b=1,
-                      #           leak=train_with_leak,
-                      #           small=small_leak)
+    transformer = transform_data(a=-1, b=1,
+                             leak=train_with_leak,
+                             small=small_leak)
 
     training_params = {'latent_dim': latent_dim,
                        'n_critic': 2,
                        'gamma': 10,
-                       'n_epochs': 1000,
+                       'n_epochs': 10000,
                        'save_string': save_string,
                        'physics_loss': train_with_physics_loss,
                        'device': device}
@@ -85,28 +85,48 @@ if __name__ == "__main__":
                          'transformer': transformer,
                          'batch_size': 256,
                          'shuffle': True,
-                         'num_workers': 12,
+                         'num_workers': 8,
                          'drop_last': True}
     generator_params = {'latent_dim': latent_dim,
                         'par_dim': 35,
                         'output_dim': 66,
                         'activation': activation,
-                        'n_neurons': [16, 32, 48, 64],
+                        'n_neurons': [32, 40, 48, 56, 64],
                         'leak': train_with_leak}
 
     critic_params = {'activation': activation,
-                     'n_neurons': [96, 80, 64, 48, 32, 16]}
+                     'n_neurons': [128, 112, 96, 80, 64, 48, 32, 16]}
     if train_with_leak:
         critic_params['input_dim'] = generator_params['output_dim'] + \
                                      generator_params['par_dim']
     else:
         critic_params['input_dim'] = generator_params['output_dim']
 
+    if train_with_physics_loss:
+        critic_params['input_dim'] += 32
+
     generator = GAN_models.Generator(**generator_params).to(device)
     critic = GAN_models.Critic(**critic_params).to(device)
 
     dataloader = get_dataloader(**dataloader_params)
 
+    '''
+    data_dict = nx.read_gpickle(data_path + str(0))
+
+    flow_rate = torch.tensor(data_dict['flow_rate'].values)[0]
+    head = torch.tensor(data_dict['head'].values)[0]
+    demand = torch.tensor(data_dict['demand'].values)[0]
+
+    data = torch.cat([flow_rate, head], dim=0)
+
+    pars = torch.zeros([35, ])
+    pars[0] = torch.tensor(data_dict['leak']['demand'])
+    pars[data_dict['leak']['pipe']] = 1
+    data = torch.cat([data, pars], dim=0)
+
+    pdb.set_trace()
+    data = transformer.min_max_transform(data)  
+    '''
     if train_WGAN:
 
         generator_optimizer = torch.optim.RMSprop(generator.parameters(),
@@ -126,14 +146,14 @@ if __name__ == "__main__":
         inp_file = path_file
         wn = wntr.network.WaterNetworkModel(inp_file)
         incidence_mat = torch.tensor(get_incidence_mat(wn),
-                                     dtype=torch.get_default_dtype(),
-                                     device=device)
+                                     dtype=torch.get_default_dtype())
 
-        z = torch.randn(10, latent_dim).to(device)
+        id = 50
+
+        z = torch.randn(100, latent_dim).to(device)
         out = generator(z)
+        out = transformer.min_max_inverse_transform(out.cpu())
         demand_pred = torch.matmul(-incidence_mat.T, out[:,0:34].T).detach().cpu()
-
-        id = 1
 
         print(demand_pred.sum(dim=0))
         print(out[:, 66])
@@ -148,12 +168,11 @@ if __name__ == "__main__":
         pdb.set_trace()
         '''
 
-
         trainer = TrainGAN(generator=generator,
                            critic=critic,
                            generator_optimizer=generator_optimizer,
                            critic_optimizer=critic_optimizer,
-                           **training_params)
+                           **training_params, transformer=transformer)
 
 
         generator_loss, critic_loss, gradient_penalty = trainer.train(

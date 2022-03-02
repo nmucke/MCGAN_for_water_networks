@@ -5,6 +5,9 @@ import matplotlib.pyplot as plt
 import torch.nn as nn
 import torch.optim as optim
 import torch
+import os
+import wntr
+from utils.graph_utils import get_incidence_mat
 
 
 class Generator(nn.Module):
@@ -60,7 +63,6 @@ class Generator(nn.Module):
                                            out_features=1,
                                            bias=False)
 
-
     def forward(self, x):
         """Forward pass."""
 
@@ -75,7 +77,7 @@ class Generator(nn.Module):
             x = batchnorm(x)
 
         state = self.out_layer_state(x)
-        #state = self.tanh(state)
+        state = self.tanh(state)
 
         if self.leak:
             par = self.out_layer_par1(x)
@@ -84,10 +86,11 @@ class Generator(nn.Module):
             par = self.out_layer_par2(par)
             par = self.activation(par)
             par = self.batchnorm_par2(par)
-            par_location = self.out_layer_location(par)
-            par_location = self.softmax(par_location)
-            par_demand = self.out_layer_demand(par)
-            return torch.cat([state, par_demand, par_location], dim=1)
+            leak_location = self.out_layer_location(par)
+            leak_location = self.softmax(leak_location)
+            leak_demand = self.out_layer_demand(par)
+            leak_demand = self.tanh(leak_demand)
+            return torch.cat([state, leak_demand, leak_location], dim=1)
         else:
             return state
 

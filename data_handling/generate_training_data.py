@@ -125,9 +125,9 @@ def simulate_WDN(demands, leak, wn):
 
 if __name__ == "__main__":
 
-    train_data = True
-    with_leak = True
-    num_samples = 200000
+    train_data = False
+    with_leak = False
+    num_samples = 1000
 
     if train_data:
         if with_leak:
@@ -165,7 +165,7 @@ if __name__ == "__main__":
     std_dev[0] = base_demands[0]*0.05
     cov_mat = cov_mat_fixed(0.6,0.0)
 
-    sample_ids = range(140000,num_samples)
+    sample_ids = range(0,num_samples)
     if with_leak:
         leak_pipes = np.random.randint(low=1, high=35, size=num_samples)
         leak_areas = np.random.uniform(low=0.01, high=0.1, size=num_samples)

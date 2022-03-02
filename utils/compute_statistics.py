@@ -11,14 +11,14 @@ def get_statistics_from_latent_samples(z_samples,
                                        gan_with_leak=True):
     gen_samples = generator(z_samples)
 
+    if transform is not None:
+        gen_samples = transform(gen_samples)
+
     if gan_with_leak:
         gen_samples, gen_leak_demand, gen_leak_pipe = \
             gen_samples[:, 0:66], gen_samples[:, 66:67], gen_samples[:, -34:]
     else:
         gen_samples = gen_samples[:, 0:66]
-
-    if transform is not None:
-        gen_samples = transform(gen_samples)
 
     gen_flow_rate_samples = gen_samples[:, 0:34]
     gen_flow_rate_mean = torch.mean(gen_flow_rate_samples, dim=0)

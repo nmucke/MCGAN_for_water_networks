@@ -17,10 +17,10 @@ class NetworkDataset(torch.utils.data.Dataset):
 
         self.dtype = torch.get_default_dtype()
 
-    def transform_state(self, data):
+    def transform_data(self, data):
         return self.transformer.min_max_transform(data)
 
-    def inverse_transform_state(self, data):
+    def inverse_transform_data(self, data):
         return self.transformer.min_max_inverse_transform(data)
 
     def __len__(self):
@@ -41,6 +41,9 @@ class NetworkDataset(torch.utils.data.Dataset):
             pars[0] = torch.tensor(data_dict['leak']['demand'], dtype=self.dtype)
             pars[data_dict['leak']['pipe']] = 1
             data = torch.cat([data, pars], dim=0)
+
+        if self.transformer is not None:
+            data = self.transform_data(data)
 
         return data, demand
 

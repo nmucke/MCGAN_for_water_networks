@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 class TrainGAN():
     def __init__(self, generator, critic, generator_optimizer, critic_optimizer,
                  latent_dim=100, n_critic=5, gamma=10, n_epochs=100,
-                 save_string=None, physics_loss=None, device='cpu'):
+                 save_string=None, physics_loss=None, device='cpu', transformer=None):
 
         self.device = device
         self.generator = generator
@@ -29,6 +29,8 @@ class TrainGAN():
 
         self.physics_loss = physics_loss
 
+        self.transformer = transformer
+
 
         # Reading the input file into EPANET
         #if self.physics_loss is not None:
@@ -42,13 +44,19 @@ class TrainGAN():
                                           dtype=torch.get_default_dtype(),
                                           device=self.device)
 
-    def physics_loss_function(self, gen_data):
+    def physics_loss_function(self, data):
 
-        leak_demand = gen_data[:, 66]
+        leak_demand = data[:, 66]
         demand_pred = torch.matmul(-self.incidence_mat.T,
-                                   gen_data[:, 0:34].T)
-        loss = leak_demand + demand_pred.sum(dim=0)
-        return loss
+                                   data[:, 0:34].T)
+        #loss = leak_demand + demand_pred.sum(dim=0)
+
+        return demand_pred.T
+
+    def get_demand(self, data):
+        demand_pred = torch.matmul(-self.incidence_mat.T,
+                                   data[:, 0:34].T)
+        return demand_pred.T
 
     def train(self, data_loader):
         """Train generator and critic"""
@@ -63,7 +71,6 @@ class TrainGAN():
 
             print(f'Epoch: {epoch}, g_loss: {g_loss:.3f},', end=' ')
             print(f'c_loss: {c_loss:.3f}, grad_penalty: {grad_penalty:.3f}')
-
 
             # Save loss
             generator_loss.append(g_loss)
@@ -117,9 +124,30 @@ class TrainGAN():
         self.C_opt.zero_grad()
         batch_size = data.size(0)
         generated_data = self.sample(batch_size)
-        grad_penalty = self.gradient_penalty(data, generated_data)
-        c_loss = self.critic(generated_data).mean() \
-                 - self.critic(data).mean() + grad_penalty
+
+        if self.physics_loss is not None:
+
+            generated_demand = self.get_demand(generated_data)
+            generated_critic_input = torch.cat(
+                    [generated_data, generated_demand], dim=1)
+
+            real_demand = self.get_demand(data)
+            real_critic_input = torch.cat([data, real_demand], dim=1)
+
+            #data = self.transformer.min_max_inverse_transform(data.detach().cpu())
+            #lol = torch.matmul(self.incidence_mat.cpu().T,data[0,-34:])
+            #pdb.set_trace()
+
+            grad_penalty = self.gradient_penalty(real_critic_input,
+                                                 generated_critic_input)
+
+            c_loss = self.critic(generated_critic_input).mean() \
+                     - self.critic(real_critic_input).mean() + grad_penalty
+        else:
+            grad_penalty = self.gradient_penalty(data,
+                                                 generated_data)
+            c_loss = self.critic(generated_data).mean() \
+                     - self.critic(data).mean() + grad_penalty
         c_loss.backward()
         self.C_opt.step()
 
@@ -131,9 +159,13 @@ class TrainGAN():
         self.G_opt.zero_grad()
         generated_data = self.sample(batch_size)
         if self.physics_loss is not None:
-            phys_loss = self.physics_loss_function(generated_data)
-            g_loss = - self.critic(generated_data).mean() \
-                     + self.physics_loss*phys_loss.mean()
+
+            generated_demand = self.get_demand(generated_data)
+            generated_critic_input = torch.cat(
+                    [generated_data, generated_demand], dim=1)
+
+            g_loss = - self.critic(generated_critic_input).mean()
+
         else:
             g_loss = - self.critic(generated_data).mean()
         g_loss.backward()

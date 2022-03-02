@@ -38,17 +38,19 @@ if __name__ == "__main__":
     incidence_mat = torch.tensor(incidence_mat, dtype=torch.get_default_dtype())
     adjacency_mat = torch.tensor(adjacency_mat, dtype=torch.get_default_dtype())
 
-    data_with_leak = True
+    data_with_leak = False
     mix_leak = False
-    gan_with_leak = True
+    gan_with_leak = False
     small_leak = False
     small_demand_variance_data = False
     small_demand_variance_gan = False
+    train_with_physics_loss = True
+
 
     leak_location_error = []
     std_list = []
     obs_error_list = []
-    cases = range(0,10)
+    cases = range(5,6)
     num_cases = len(cases)
     for case in cases:
 
@@ -79,24 +81,27 @@ if __name__ == "__main__":
                 if small_demand_variance_gan:
                     load_string = 'model_weights/GAN_leak_small_demand_variance'
                 else:
-                    load_string = 'model_weights/GAN_leak'
+                    if train_with_physics_loss:
+                        load_string = 'model_weights/GAN_leak_and_pysics_loss'
+                    else:
+                        load_string = 'model_weights/GAN_leak'
         else:
             if small_demand_variance_gan:
                 load_string = 'model_weights/GAN_no_leak_small_demand_variance'
             else:
                 load_string = 'model_weights/GAN_no_leak'
 
-        latent_dim = 16
+        latent_dim = 32
         activation = nn.LeakyReLU()
-        transformer = None#transform_data(a=-1, b=1,
-                          #           leak=gan_with_leak,
-                          #           small=small_leak)
+        transformer = transform_data(a=-1, b=1,
+                                 leak=gan_with_leak,
+                                 small=small_leak)
 
         generator_params = {'latent_dim': latent_dim,
                             'par_dim': 35,
                             'output_dim': 66,
                             'activation': activation,
-                            'n_neurons': [16, 32, 48, 64],
+                            'n_neurons': [32, 40, 48, 56, 64],
                             'leak': gan_with_leak}
 
         generator = GAN_models.Generator(**generator_params).to(device)
@@ -111,14 +116,21 @@ if __name__ == "__main__":
         true_head = torch.tensor(true_data_dict['head'].values,
                                       dtype=torch.get_default_dtype(),
                                       device=device)
+        true_demand = torch.tensor(true_data_dict['demand'].values,
+                                      dtype=torch.get_default_dtype(),
+                                      device=device)
 
-        edge_obs_idx = range(0,34)
-        node_obs_idx = range(0,32)
+
+        true_demand_pred = torch.matmul(-incidence_mat.T, true_flow_rate.T).detach().cpu()
+
+
+        edge_obs_idx = range(0,34, 3)
+        node_obs_idx = range(0,32, 3)
         obs_idx = {'edge_obs_idx': edge_obs_idx,
                    'node_obs_idx': node_obs_idx}
 
-        edge_obs_std = 0.15
-        node_obs_std = 0.15
+        edge_obs_std = 0.05
+        node_obs_std = 0.05
         std = {'edge_obs_std': edge_obs_std,
                'node_obs_std': node_obs_std}
 
@@ -179,10 +191,10 @@ if __name__ == "__main__":
                             'noise_std': torch.cat([noise_distribution['flow_rate_noise_std'],
                                                     noise_distribution['head_noise_std']],
                                                     dim=1)}
-        HMC_params = {'num_samples': 10000,
+        HMC_params = {'num_samples': 350,
                       'step_size': 1.,
                       'num_steps_per_sample': 5,
-                      'burn': 7500,
+                      'burn': 200,
                       'integrator': hamiltorch.Integrator.IMPLICIT,
                       'sampler': hamiltorch.Sampler.HMC_NUTS,
                       'desired_accept_rate': 0.3}
@@ -194,7 +206,8 @@ if __name__ == "__main__":
         MCGAN_results = \
             get_statistics_from_latent_samples(z_samples=z_samples,
                                                generator=generator,
-                                               transform=transformer)
+                                               gan_with_leak=gan_with_leak,
+                                               transform=transformer.min_max_inverse_transform)
 
         flow_rate_std = torch.mean(MCGAN_results['flow_rate']['std']).item()
         head_std = torch.mean(MCGAN_results['head']['std']).item()
@@ -234,8 +247,16 @@ if __name__ == "__main__":
         G_MCGAN = create_graph_from_data(MCGAN_results, G_true, incidence_mat)
 
         plt.figure()
-        plt.plot(MCGAN_results['demand']['mean'].detach())
-        plt.plot(true_data_dict['demand'].values[0])
+        plt.plot(range(1,33), MCGAN_results['demand']['mean'].detach(), label='GAN')
+        plt.plot(range(1,33), true_data_dict['demand'].values[0], label='True')
+        #plt.axvline(x=true_data_dict['leak']['pipe'], label='True Location', color='red')
+        #plt.axvline(x=MCGAN_results['leak']['estimate'], label='GAN Location', color='green')
+        plt.fill_between(range(1,33),
+                         MCGAN_results['demand']['mean'].detach() - MCGAN_results['demand']['std'].detach(),
+                         MCGAN_results['demand']['mean'].detach() + MCGAN_results['demand']['std'].detach(), alpha=0.2)
+
+        plt.legend()
+        plt.savefig('no_leak_data_no_leak_gen')
         plt.show()
 
         if gan_with_leak:
@@ -249,12 +270,12 @@ if __name__ == "__main__":
                                             G_true=G_true,
                                             save_string="MCGAN_results")
 
-        if gan_with_leak:
-            print(f'Case {case} is done, leak: {leak_location_error[-1]},'
-                  f' observation error: {obs_error_list[-1]:0.4f}, std: {std:0.4f}')
-        else:
-            print(f'Case {case} is done, leak present: {data_with_leak},'
-                  f' observation error: {obs_error_list[-1]:0.4f}, std: {std:0.4f}')
+        #if gan_with_leak:
+        #    print(f'Case {case} is done, leak: {leak_location_error[-1]},'
+        #          f' observation error: {obs_error_list[-1]:0.4f}, std: {std:0.4f}')
+        #else:
+        #    print(f'Case {case} is done, leak present: {data_with_leak},'
+        #          f' observation error: {obs_error_list[-1]:0.4f}, std: {std:0.4f}')
 
     '''
     num_corrects = np.sum(leak_location_error)
