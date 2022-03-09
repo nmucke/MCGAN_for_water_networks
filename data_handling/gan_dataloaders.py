@@ -7,8 +7,10 @@ from utils.graph_utils import get_graph_features, get_graph_data
 
 class NetworkDataset(torch.utils.data.Dataset):
 
-    def __init__(self, data_path, num_files=100000, transformer=None):
+    def __init__(self, data_path, num_files=100000, transformer=None,
+                        no_leak_classification=False):
 
+        self.no_leak_classification = no_leak_classification
         self.data_path_state = data_path
         self.num_files = num_files
         self.transformer = transformer
@@ -38,6 +40,11 @@ class NetworkDataset(torch.utils.data.Dataset):
 
         if 'leak' in data_dict:
             pars = torch.zeros([35,], dtype=self.dtype)
+            pars[0] = torch.tensor(data_dict['leak']['demand'], dtype=self.dtype)
+            pars[data_dict['leak']['pipe']] = 1
+            data = torch.cat([data, pars], dim=0)
+        elif self.no_leak_classification:
+            pars = torch.zeros([36,], dtype=self.dtype)
             pars[0] = torch.tensor(data_dict['leak']['demand'], dtype=self.dtype)
             pars[data_dict['leak']['pipe']] = 1
             data = torch.cat([data, pars], dim=0)

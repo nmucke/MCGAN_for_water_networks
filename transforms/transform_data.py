@@ -2,8 +2,10 @@ import pdb
 import numpy as np
 import networkx as nx
 import torch
+import sys
+import os
+sys.path.append(os.getcwd())
 from utils.graph_utils import get_graph_data
-
 
 class transform_data():
     def __init__(self, a=-1, b=1, leak=True, small=False):
@@ -97,42 +99,43 @@ class transform_data():
         return data
 
 if __name__ == "__main__":
-    data_path_state = '../data/training_data_no_leak/network_'
+
+    data_path_state = 'data/training_data_with_leak/network_'
 
     flow_rate_list = []
     head_list = []
     leak_demand_list = []
-    for i in range(200000):
+    for i in range(100000):
         #G = nx.read_gpickle(data_path_state + str(i))
         data_dict = nx.read_gpickle(data_path_state + str(i))
 
         flow_rate = torch.tensor(data_dict['flow_rate'].values)[0]
         head = torch.tensor(data_dict['head'].values)[0]
-        #leak_demand = torch.tensor(data_dict['leak']['demand'])
+        leak_demand = torch.tensor(data_dict['leak']['demand'])
 
         flow_rate_list.append(flow_rate)
         head_list.append(head)
-        #leak_demand_list.append(leak_demand)
+        leak_demand_list.append(leak_demand)
 
         if i % 1000 == 0:
             print(i)
     flow_rate_list = torch.stack(flow_rate_list).detach().numpy()
     head_list = torch.stack(head_list).detach().numpy()
-    #leak_demand_list = torch.stack(leak_demand_list).detach().numpy()
+    leak_demand_list = torch.stack(leak_demand_list).detach().numpy()
 
     max_flow_rate = np.max(flow_rate_list, axis=0)
     min_flow_rate = np.min(flow_rate_list, axis=0)
     max_head = np.max(head_list, axis=0)
     min_head = np.min(head_list, axis=0)
-    #max_leak_demand = np.max(leak_demand_list)
-    #min_leak_demand = np.min(leak_demand_list)
+    max_leak_demand = np.max(leak_demand_list)
+    min_leak_demand = np.min(leak_demand_list)
 
-    np.save('max_min_data_no_leak', {'max_flow_rate': max_flow_rate,
+    np.save('max_min_data_with_leak', {'max_flow_rate': max_flow_rate,
                                        'min_flow_rate': min_flow_rate,
                                        'max_head': max_head,
-                                       'min_head': min_head})
-                                       #'max_leak_demand': max_leak_demand,
-                                       #'min_leak_demand': min_leak_demand})
+                                       'min_head': min_head,
+                                       'max_leak_demand': max_leak_demand,
+                                       'min_leak_demand': min_leak_demand})
 
 
 

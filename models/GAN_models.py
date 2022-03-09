@@ -58,7 +58,6 @@ class Generator(nn.Module):
                                            out_features=self.par_dim-1,
                                            bias=False)
 
-
             self.out_layer_demand= nn.Linear(in_features=self.n_neurons[-2],
                                            out_features=1,
                                            bias=False)

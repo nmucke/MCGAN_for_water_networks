@@ -19,7 +19,7 @@ if __name__ == "__main__":
 
     seed_everything()
 
-    cuda = True
+    cuda = False
     if cuda:
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     else:
@@ -27,9 +27,10 @@ if __name__ == "__main__":
     print(f'Training GAN on {device}')
 
 
-    train_with_leak = True
+    train_with_leak = False
     small_leak = False
     train_with_physics_loss = True
+    #no_leak_classification = True
 
     small_demand_variance = False
 
@@ -85,7 +86,7 @@ if __name__ == "__main__":
                          'transformer': transformer,
                          'batch_size': 256,
                          'shuffle': True,
-                         'num_workers': 8,
+                         'num_workers': 4,
                          'drop_last': True}
     generator_params = {'latent_dim': latent_dim,
                         'par_dim': 35,
