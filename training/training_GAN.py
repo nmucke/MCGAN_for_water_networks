@@ -110,7 +110,6 @@ class TrainGAN():
             #leak_location = torch.argmax(real_data[:, -34:], dim=1).detach().cpu()
             #print(leak_location)
 
-            #pdb.set_trace()
             c_loss, grad_penalty = self.critic_train_step(real_data)
 
             if bidx % self.n_critic == 0:
@@ -125,7 +124,7 @@ class TrainGAN():
         batch_size = data.size(0)
         generated_data = self.sample(batch_size)
 
-        if self.physics_loss is not None:
+        if self.physics_loss:
 
             generated_demand = self.get_demand(generated_data)
             generated_critic_input = torch.cat(
@@ -158,11 +157,10 @@ class TrainGAN():
 
         self.G_opt.zero_grad()
         generated_data = self.sample(batch_size)
-        if self.physics_loss is not None:
+        if self.physics_loss:
 
             generated_demand = self.get_demand(generated_data)
-            generated_critic_input = torch.cat(
-                    [generated_data, generated_demand], dim=1)
+            generated_critic_input = torch.cat([generated_data, generated_demand], dim=1)
 
             g_loss = - self.critic(generated_critic_input).mean()
 

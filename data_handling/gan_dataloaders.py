@@ -7,8 +7,12 @@ from utils.graph_utils import get_graph_features, get_graph_data
 
 class NetworkDataset(torch.utils.data.Dataset):
 
-    def __init__(self, data_path, num_files=100000, transformer=None,
-                        no_leak_classification=False):
+    def __init__(self,
+                 data_path,
+                 num_files=100000,
+                 transformer=None,
+                 no_leak_classification=False,
+                 sensors=None):
 
         self.no_leak_classification = no_leak_classification
         self.data_path_state = data_path
@@ -18,6 +22,8 @@ class NetworkDataset(torch.utils.data.Dataset):
         self.state_IDs = [i for i in range(self.num_files)]
 
         self.dtype = torch.get_default_dtype()
+
+        self.sensors = sensors
 
     def transform_data(self, data):
         return self.transformer.min_max_transform(data)
@@ -43,15 +49,28 @@ class NetworkDataset(torch.utils.data.Dataset):
             pars[0] = torch.tensor(data_dict['leak']['demand'], dtype=self.dtype)
             pars[data_dict['leak']['pipe']] = 1
             data = torch.cat([data, pars], dim=0)
+
         elif self.no_leak_classification:
             pars = torch.zeros([36,], dtype=self.dtype)
             pars[0] = torch.tensor(data_dict['leak']['demand'], dtype=self.dtype)
             pars[data_dict['leak']['pipe']] = 1
             data = torch.cat([data, pars], dim=0)
 
+        if self.sensors is not None:
+            flow_rate_sensors = flow_rate[self.sensors['flow_rate_sensors']]
+            head_sensors = head[self.sensors['head_sensors']]
+            data = torch.cat([flow_rate_sensors, head_sensors], dim=0)
+
+            if 'leak' in data_dict:
+                pars = torch.zeros([35, ], dtype=self.dtype)
+                pars[0] = torch.tensor(data_dict['leak']['demand'],
+                                       dtype=self.dtype)
+                pars[data_dict['leak']['pipe']] = 1
+                data = torch.cat([data, pars], dim=0)
+
         if self.transformer is not None:
             data = self.transform_data(data)
-
+        
         return data, demand
 
 def get_dataloader(data_path,
@@ -60,12 +79,14 @@ def get_dataloader(data_path,
                     batch_size=512,
                     shuffle=True,
                     num_workers=2,
-                    drop_last=True
+                    drop_last=True,
+                    sensors=None
                     ):
 
     dataset = NetworkDataset(data_path=data_path,
                              num_files=num_files,
-                             transformer=transformer)
+                             transformer=transformer,
+                             sensors=sensors)
     dataloader = torch.utils.data.DataLoader(dataset,
                                                batch_size=batch_size,
                                                shuffle=shuffle,

@@ -19,6 +19,7 @@ import wntr
 from utils.graph_utils import get_incidence_mat, incidence_to_adjacency
 from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
 import pandas as pd
+import ray
 
 torch.set_default_dtype(torch.float32)
 
@@ -138,7 +139,7 @@ if __name__ == "__main__":
     data_with_leak = True
     gan_with_leak = False
 
-    train_data = True
+    train_data = False
 
     small_leak = False
     small_demand_variance_data = False
@@ -310,17 +311,12 @@ if __name__ == "__main__":
         flow_rate_std = torch.mean(MCGAN_results['flow_rate']['std']).item()
         head_std = torch.mean(MCGAN_results['head']['std']).item()
 
-        flow_rate_obs_error_list.append(MCMC_obs_error['flow_rate'].item())
-        head_obs_error_list.append(MCMC_obs_error['head'].item())
-
-        obs_error_list.append(0.5*( + MCMC_obs_error['head']).item())
 
         MCGAN_results['demand'] = get_demand_statistics(data=MCGAN_results,
                                                         incidence_mat=incidence_mat)
 
         demand_diff = true_demand[0, 0] - MCGAN_results['demand']['mean'].detach()[0]
         demand_diff = demand_diff.item()
-        reservoir_demand_diff.append(demand_diff)
 
         transformer_leak = transform_data(a=-1, b=1,
                                           leak=True,
@@ -359,12 +355,15 @@ if __name__ == "__main__":
         critic_input_no_leak = transformer_no_leak.min_max_transform(critic_input_no_leak)
 
         critic_score_leak = critic_leak(critic_input_leak)
-        crtic_score_list_leak.append(critic_score_leak.item())
 
         critic_score_no_leak = critic_no(critic_input_no_leak)
+
+        crtic_score_list_leak.append(critic_score_leak.item())
         crtic_score_list_no_leak.append(critic_score_no_leak.item())
-
-
+        reservoir_demand_diff.append(demand_diff)
+        flow_rate_obs_error_list.append(MCMC_obs_error['flow_rate'].item())
+        head_obs_error_list.append(MCMC_obs_error['head'].item())
+        obs_error_list.append(0.5*( + MCMC_obs_error['head']).item())
         flow_rate_std_list.append(flow_rate_std)
         head_std_list.append(head_std)
 

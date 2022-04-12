@@ -76,7 +76,7 @@ class Generator(nn.Module):
             x = batchnorm(x)
 
         state = self.out_layer_state(x)
-        state = self.tanh(state)
+        #state = self.tanh(state)
 
         if self.leak:
             par = self.out_layer_par1(x)
@@ -88,7 +88,7 @@ class Generator(nn.Module):
             leak_location = self.out_layer_location(par)
             leak_location = self.softmax(leak_location)
             leak_demand = self.out_layer_demand(par)
-            leak_demand = self.tanh(leak_demand)
+            #leak_demand = self.tanh(leak_demand)
             return torch.cat([state, leak_demand, leak_location], dim=1)
         else:
             return state

@@ -29,8 +29,9 @@ if __name__ == "__main__":
 
     train_with_leak = False
     small_leak = False
-    train_with_physics_loss = True
+    train_with_physics_loss = False
     #no_leak_classification = True
+    with_sensors = True
 
     small_demand_variance = False
 
@@ -66,37 +67,48 @@ if __name__ == "__main__":
             load_string = 'model_weights/GAN_no_leak'
             save_string = 'model_weights/GAN_no_leak'
 
+    if with_sensors:
+        load_string = load_string + "_sensors"
+        save_string = save_string + "_sensors"
 
-    latent_dim = 32
+    latent_dim = 8
     activation = nn.LeakyReLU()
-    transformer = transform_data(a=-1, b=1,
-                             leak=train_with_leak,
-                             small=small_leak)
+    transformer = None#transform_data(a=-1, b=1,
+                       #      leak=train_with_leak,
+                       #      small=small_leak)
 
+    sensors = {'flow_rate_sensors': [3, 7, 16, 19, 26, 29, 32],
+               'head_sensors': [3, 8, 17, 19, 26, 27, 31]}
+
+    if with_sensors:
+        output_dim = len(sensors['flow_rate_sensors']) + len(sensors['head_sensors'])
+    else:
+        output_dim = 66
     training_params = {'latent_dim': latent_dim,
-                       'n_critic': 2,
+                       'n_critic': 3,
                        'gamma': 10,
                        'n_epochs': 10000,
                        'save_string': save_string,
                        'physics_loss': train_with_physics_loss,
                        'device': device}
-    optimizer_params = {'learning_rate': 1e-4}
+    optimizer_params = {'learning_rate': 1e-2}
     dataloader_params = {'data_path': data_path,
                          'num_files': 200000,
                          'transformer': transformer,
                          'batch_size': 256,
                          'shuffle': True,
-                         'num_workers': 4,
-                         'drop_last': True}
+                         'num_workers': 12,
+                         'drop_last': True,
+                         'sensors': sensors}
     generator_params = {'latent_dim': latent_dim,
                         'par_dim': 35,
-                        'output_dim': 66,
+                        'output_dim': output_dim,
                         'activation': activation,
-                        'n_neurons': [32, 40, 48, 56, 64],
+                        'n_neurons': [8, 12, 16, 24],
                         'leak': train_with_leak}
 
     critic_params = {'activation': activation,
-                     'n_neurons': [128, 112, 96, 80, 64, 48, 32, 16]}
+                     'n_neurons': [24, 16, 12, 8]}
     if train_with_leak:
         critic_params['input_dim'] = generator_params['output_dim'] + \
                                      generator_params['par_dim']
@@ -110,6 +122,7 @@ if __name__ == "__main__":
     critic = GAN_models.Critic(**critic_params).to(device)
 
     dataloader = get_dataloader(**dataloader_params)
+    lol, _ = dataloader.dataset[0]
 
     '''
     data_dict = nx.read_gpickle(data_path + str(0))
